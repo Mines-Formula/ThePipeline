@@ -2,9 +2,8 @@ services:
   web:
     build:
       context: ./src
-      network: host
-    network_mode: host
-    ports: !reset []
+    ports:
+      - "6767:6767"
     stop_signal: SIGINT
     restart: unless-stopped
     volumes:
