@@ -1,0 +1,15 @@
+services:
+  web:
+    build:
+      context: ./src
+      network: host
+    network_mode: host
+    ports: !reset []
+    stop_signal: SIGINT
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      - FLASK_ENV=production
+      - DATA_DIR=/data
+    command: ["flask", "--app", "app.app:app", "run", "-h", "0.0.0.0", "-p", "6768"] # Instructs dev container to launch Flask on port 6768 so a seperate Docekrfile isn't needed.
