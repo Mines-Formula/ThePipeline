@@ -44,10 +44,16 @@ jobs:
     steps:
       - name: Update repository
         if: github.event.action != 'closed' && inputs.action != 'stop'
-        working-directory: /srv/formula/ThePipeline-dev
         run: |
           set -euo pipefail
 
+          # Clones if missing, skips if already exists
+          TARGET_DIR="/srv/formula/ThePipeline-dev"
+          if [ ! -d "$TARGET_DIR" ]; then
+            git clone git@github.com:Mines-Formula/ThePipeline.git "$TARGET_DIR"
+          fi
+
+          cd "$TARGET_DIR"
           git fetch --prune origin
           git checkout ${{ github.head_ref || inputs.branch }}
           git reset --hard origin/${{ github.head_ref || inputs.branch }}
