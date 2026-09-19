@@ -1,0 +1,97 @@
+name: Deploy Dev Environment
+
+on:
+  # Allows a maintainer to run or teardown a dev environment manually for any branch
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+      action:
+        description: 'Action (deploy or stop)'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - stop
+          
+  # Automatically deploy on PR, update on new commits, and stop when merged/closed       
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+
+concurrency:
+  group: thepipeline-dev-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Manage Dev Environment
+    runs-on:
+      - self-hosted
+      - Linux
+      - fsaelinux
+
+    timeout-minutes: 15
+
+    steps:
+      - name: Update repository
+        if: github.event.action != 'closed' && inputs.action != 'stop'
+        working-directory: /srv/formula/ThePipeline-dev
+        run: |
+          set -euo pipefail
+
+          git fetch --prune origin
+          git checkout ${{ github.head_ref || inputs.branch }}
+          git reset --hard origin/${{ github.head_ref || inputs.branch }}
+
+          # The parent reset does not discard changes inside submodules.
+          # Clean them so stale/generated DBC files cannot prevent checkout.
+          git submodule foreach --recursive 'git reset --hard && git clean -ffd'
+          git submodule update --init --recursive --force
+
+      - name: Stop dev environment
+        if: github.event.action == 'closed' || inputs.action == 'stop'
+        working-directory: /srv/formula/ThePipeline-dev
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p thepipeline-dev \
+            -f docker-compose.dev.yml \
+            down --remove-orphans
+
+      - name: Validate Docker Compose configuration
+        if: github.event.action != 'closed' && inputs.action != 'stop'
+        working-directory: /srv/formula/ThePipeline-dev
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p thepipeline-dev \
+            -f docker-compose.dev.yml \
+            config --quiet
+
+      - name: Build and deploy
+        if: github.event.action != 'closed' && inputs.action != 'stop'
+        working-directory: /srv/formula/ThePipeline-dev
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p thepipeline-dev \
+            -f docker-compose.dev.yml \
+            up --detach --build --remove-orphans
+
+      - name: Show deployment status
+        if: always()
+        working-directory: /srv/formula/ThePipeline-dev
+        run: |
+          docker compose \
+            -p thepipeline-dev \
+            -f docker-compose.dev.yml \
+            ps
