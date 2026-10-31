@@ -406,6 +406,8 @@ def list_files():
 def download_file(filename):
     if (RERUN_DIR / Path(filename)).exists():
         dir = RERUN_DIR
+    elif (RAW_DIR / Path(filename)).exists():
+        dir = RAW_DIR
     else:
         dir = CSV_DIR
 

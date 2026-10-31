@@ -558,3 +558,107 @@ class TestUpload:
         _write_upload_file(page, tmp_path)
 
         expect(page.locator("#alertContainer")).not_to_contain_text("Old alert")
+
+
+'''
+Activity Heatmaps
+'''
+
+class TestActivityHeatmaps:
+    @pytest.mark.usefixtures("setup_empty_files_page")
+    def test_all_three_heatmaps_present(self, page: Page, server_url):
+        expect(page.locator("#csvHeatmap")).to_be_visible()
+        expect(page.locator("#rerunHeatmap")).to_be_visible()
+        expect(page.locator("#rawHeatmap")).to_be_visible()
+
+    @pytest.mark.usefixtures("setup_empty_files_page")
+    def test_heatmaps_render_svg(self, page: Page, server_url):
+        expect(page.locator("#csvHeatmap svg")).to_be_visible()
+        expect(page.locator("#rerunHeatmap svg")).to_be_visible()
+        expect(page.locator("#rawHeatmap svg")).to_be_visible()
+
+    @pytest.mark.usefixtures("setup_empty_files_page")
+    def test_heatmaps_render_day_labels(self, page: Page, server_url):
+        expect(page.locator("#csvHeatmap text", has_text="Mon")).to_be_visible()
+        expect(page.locator("#csvHeatmap text", has_text="Wed")).to_be_visible()
+        expect(page.locator("#csvHeatmap text", has_text="Fri")).to_be_visible()
+
+    @pytest.mark.usefixtures("setup_empty_files_page")
+    def test_heatmaps_render_legend(self, page: Page, server_url):
+        expect(page.locator("#csvCard .heatmap-legend")).to_contain_text("Less")
+        expect(page.locator("#csvCard .heatmap-legend")).to_contain_text("More")
+        expect(page.locator("#csvCard .legend-cell.level-0")).to_be_visible()
+        expect(page.locator("#csvCard .legend-cell.level-4")).to_be_visible()
+
+    def test_heatmap_highlights_active_dates(self, page: Page, server_url):
+        page.route("**/files**", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_TWO_FILES
+        ))
+        _goto(page, server_url)
+
+        rect_15 = page.locator("#csvHeatmap rect[data-date='2024-01-15']")
+        expect(rect_15).to_have_attribute("data-count", "1")
+        assert int(rect_15.get_attribute("data-level")) > 0
+
+        rect_14 = page.locator("#csvHeatmap rect[data-date='2024-01-14']")
+        expect(rect_14).to_have_attribute("data-count", "1")
+        assert int(rect_14.get_attribute("data-level")) > 0
+
+    def test_heatmap_tooltip_on_hover(self, page: Page, server_url):
+        page.route("**/files**", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_TWO_FILES
+        ))
+        _goto(page, server_url)
+
+        rect_15 = page.locator("#csvHeatmap rect[data-date='2024-01-15']")
+        rect_15.hover()
+
+        tooltip = page.locator("#heatmapTooltip")
+        expect(tooltip).to_be_visible()
+        expect(tooltip).to_contain_text("1 file on")
+        expect(tooltip).to_contain_text("Jan 15, 2024")
+
+    def test_heatmap_click_filters_file_list(self, page: Page, server_url):
+        page.route("**/files**", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_TWO_FILES
+        ))
+        _goto(page, server_url)
+
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(2)
+
+        rect_15 = page.locator("#csvHeatmap rect[data-date='2024-01-15']")
+        rect_15.click()
+
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+        expect(page.locator("#csvfileList")).to_contain_text("run1.csv")
+        expect(page.locator("#csvfileList")).not_to_contain_text("run2.csv")
+
+        expect(page.locator("#csvFilterBanner")).to_be_visible()
+        expect(page.locator("#csvFilterBanner")).to_contain_text("2024-01-15")
+
+        page.locator("#csvClearFilterBtn").click()
+
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(2)
+        expect(page.locator("#csvFilterBanner")).not_to_be_visible()
+
+    def test_heatmap_click_again_toggles_filter(self, page: Page, server_url):
+        page.route("**/files**", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_TWO_FILES
+        ))
+        _goto(page, server_url)
+
+        rect_15 = page.locator("#csvHeatmap rect[data-date='2024-01-15']")
+        rect_15.click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+
+        rect_15.click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(2)
+
+    def test_raw_and_rerun_heatmaps_work(self, page: Page, server_url):
+        page.route("**/files**", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_TWO_FILES
+        ))
+        _goto(page, server_url)
+
+        expect(page.locator("#rerunHeatmap rect[data-date='2024-01-15']")).to_have_attribute("data-count", "1")
+        expect(page.locator("#rawHeatmap rect[data-date='2024-01-15']")).to_have_attribute("data-count", "1")
