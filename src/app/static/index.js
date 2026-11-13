@@ -247,6 +247,8 @@ function formatTooltipDate(dateStr) {
 }
 
 function renderHeatmap(type) {
+  const container = document.getElementById(`${type}Heatmap`);
+  const yearSelect = document.getElementById(`${type}YearSelect`);
   const summarySpan = document.getElementById(`${type}HeatmapSummary`);
   if (!container) return;
 
