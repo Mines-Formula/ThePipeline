@@ -19,9 +19,12 @@ body {
 }
 
 main {
+    display: flex;
+    flex-direction: column;
     min-height: 0;
     position: relative;
     z-index: 1;
+    justify-content: flex-start;
 }
 
 .navbar {

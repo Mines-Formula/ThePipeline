@@ -571,9 +571,11 @@ function renderFileList(type) {
   }
 }
 
-async function loadFiles(type) {
-  const list = document.getElementById(`${type}fileList`);
-  list.innerHTML = "";
+      const downloadA = document.createElement("a");
+      downloadA.className = "btn btn-sm btn-outline-primary";
+      downloadA.textContent = "Download";
+      downloadA.href = `/files/download/${encodeURIComponent(file.name)}?type=${encodeURIComponent(type)}`;
+      downloadA.setAttribute("download", "");
 
   try {
     const res = await fetch(`/files?type=${type}`);
