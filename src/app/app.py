@@ -404,12 +404,26 @@ def list_files():
 
 @app.route("/files/download/<path:filename>")
 def download_file(filename):
-    if (RERUN_DIR / Path(filename)).exists():
-        dir = RERUN_DIR
-    else:
-        dir = CSV_DIR
+    type_ = request.args.get("type", "").casefold()
+    type_to_dir = {
+        "csv": CSV_DIR,
+        "rerun": RERUN_DIR,
+        "raw": RAW_DIR,
+    }
 
-    return send_from_directory(dir, filename, as_attachment=True)
+    if type_:
+        try:
+            directory = type_to_dir[type_]
+        except KeyError:
+            return "Invalid type!", 400
+    elif (RERUN_DIR / Path(filename)).exists():
+        # Preserve compatibility with download links created before file types
+        # were included in the URL.
+        directory = RERUN_DIR
+    else:
+        directory = CSV_DIR
+
+    return send_from_directory(directory, filename, as_attachment=True)
 
 
 if __name__ == "__main__":

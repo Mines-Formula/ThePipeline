@@ -224,7 +224,7 @@ async function loadFiles(type) {
       const downloadA = document.createElement("a");
       downloadA.className = "btn btn-sm btn-outline-primary";
       downloadA.textContent = "Download";
-      downloadA.href = `/files/download/${encodeURIComponent(file.name)}`;
+      downloadA.href = `/files/download/${encodeURIComponent(file.name)}?type=${encodeURIComponent(type)}`;
       downloadA.setAttribute("download", "");
 
       li.appendChild(leftDiv);
