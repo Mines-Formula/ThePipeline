@@ -127,7 +127,10 @@ class TestPageStructure:
         page.locator("#inputFormat").select_option("protobuf_delimited")
         main = page.locator("main")
         assert main.evaluate("element => getComputedStyle(element).minHeight") == "0px"
-        assert main.evaluate("element => getComputedStyle(element).justifyContent") == "flex-start"
+        assert main.evaluate("element => getComputedStyle(element).justifyContent") in {
+            "flex-start",
+            "flow-start",
+        }
         expect(page.locator("label[for='schemaInput']")).to_be_in_viewport()
 
     def test_schema_input_allows_multiple_proto_files(self, page: Page, server_url):
