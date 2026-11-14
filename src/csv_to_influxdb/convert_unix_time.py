@@ -25,7 +25,11 @@ def _parse_time_value(time_value: int) -> tuple[int, int, int]:
 
 def build_time_ref(file) -> float:
     # Read only needed cols for efficiency
-    df = pd.read_csv(file)
+    return time_ref_from_frame(pd.read_csv(file, usecols=["Sensor", "Value"]))
+
+
+def time_ref_from_frame(df: pd.DataFrame) -> float:
+    """Same as build_time_ref, for a csv that has already been loaded."""
     DateRow = df[(df["Sensor"] == "Date")]  # DDMMYY
     TimeRow = df[(df["Sensor"] == "Time")]  # HHMMSS.sss
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import BinaryIO
@@ -63,28 +62,28 @@ def decode_to_csv(
 def _write_raw_can_via_dbc(
     records: Iterator[DecodedRecord], output: Path
 ) -> int:
-    count = 0
-    with tempfile.TemporaryDirectory() as temporary_directory:
-        raw_path = Path(temporary_directory) / "raw_can.data"
-        with raw_path.open("w", newline="") as raw:
-            # make_known historically discards the first two lines.
-            raw.write("Telemetry input adapter\nTimestamp,CANID,DataBytes\n")
-            for record in records:
-                normalized = record.normalized
-                if record.message_type == "formula.string":
-                    continue
-                if normalized is None or not normalized.is_raw_can:
-                    raise ValueError(
-                        f"raw CAN record is missing mapped can_id or payload "
-                        f"(message_type={record.message_type}, "
-                        f"offset={record.source_offset})"
-                    )
-                payload = ",".join(str(item) for item in normalized.payload or b"")
-                suffix = f",{payload}" if payload else ""
-                raw.write(f"{normalized.timestamp},{normalized.can_id}{suffix}\n")
-                count += 1
-        decode.make_known(str(raw_path), str(output))
-    return count
+    # Frames go straight to the DBC decoder. Previously they were written to a
+    # temporary text file only for make_known to parse them straight back.
+    frames = []
+    for record in records:
+        normalized = record.normalized
+        if record.message_type == "formula.string":
+            continue
+        if normalized is None or not normalized.is_raw_can:
+            raise ValueError(
+                f"raw CAN record is missing mapped can_id or payload "
+                f"(message_type={record.message_type}, "
+                f"offset={record.source_offset})"
+            )
+        frames.append(
+            (
+                int(normalized.timestamp),
+                int(normalized.can_id),
+                bytes(normalized.payload or b""),
+            )
+        )
+    decode.decode_frames(frames, str(output))
+    return len(frames)
 
 
 def _write_telemetry_csv(
