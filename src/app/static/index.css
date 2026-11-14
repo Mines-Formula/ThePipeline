@@ -179,8 +179,10 @@ main {
    Activity Heatmap (GitHub Style)
    ========================================================================== */
 
-.heatmap-wrapper {
-    background-color: #f8fafc;
+#activityYearSelect {
+    width: auto;
+    font-size: 0.75rem;
+    height: 28px;
 }
 
 .file-heatmap {

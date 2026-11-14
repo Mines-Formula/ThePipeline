@@ -12,10 +12,13 @@ let pollIntervalId = null;
 
 // File state per type
 const state = {
-  csv: { files: [], selectedDate: null, selectedYear: "auto" },
-  rerun: { files: [], selectedDate: null, selectedYear: "auto" },
-  raw: { files: [], selectedDate: null, selectedYear: "auto" },
+  csv: { files: [] },
+  rerun: { files: [] },
+  raw: { files: [] },
 };
+
+const FILE_TYPES = Object.keys(state);
+const activityState = { selectedDate: null, selectedYear: "auto" };
 
 const LEVEL_COLORS = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"];
 const MONTH_NAMES = [
@@ -246,14 +249,35 @@ function formatTooltipDate(dateStr) {
   });
 }
 
-function renderHeatmap(type) {
-  const summarySpan = document.getElementById(`${type}HeatmapSummary`);
+function renderAllFileLists() {
+  FILE_TYPES.forEach(renderFileList);
+}
+
+function selectActivityDate(date) {
+  activityState.selectedDate = date;
+  if (heatmapTooltip) heatmapTooltip.classList.remove("show");
+  renderHeatmap();
+  renderAllFileLists();
+}
+
+function renderHeatmap() {
+  const container = document.getElementById("activityHeatmap");
+  const yearSelect = document.getElementById("activityYearSelect");
   if (!container) return;
 
-  const files = state[type].files || [];
+  const files = FILE_TYPES.flatMap((type) => state[type].files);
 
   // Group files by date
   const counts = {};
+  const countsByType = {};
+  for (const type of FILE_TYPES) {
+    for (const file of state[type].files) {
+      const date = extractFileDate(file);
+      if (!date) continue;
+      countsByType[date] ??= { csv: 0, rerun: 0, raw: 0 };
+      countsByType[date][type]++;
+    }
+  }
   const fileDates = [];
   for (const file of files) {
     const dateStr = extractFileDate(file);
@@ -270,7 +294,7 @@ function renderHeatmap(type) {
   const years = Array.from(yearsSet).sort((a, b) => b - a);
 
   // If selectedYear is 'auto', choose smart default
-  if (!state[type].selectedYear || state[type].selectedYear === "auto") {
+  if (!activityState.selectedYear || activityState.selectedYear === "auto") {
     if (fileDates.length > 0) {
       const sortedDates = [...fileDates].sort();
       const latestDateStr = sortedDates[sortedDates.length - 1];
@@ -280,18 +304,18 @@ function renderHeatmap(type) {
       const diffDays = (new Date() - latestDateObj) / (1000 * 60 * 60 * 24);
 
       if (diffDays > 365) {
-        state[type].selectedYear = String(latestYear);
+        activityState.selectedYear = String(latestYear);
       } else {
-        state[type].selectedYear = "last12";
+        activityState.selectedYear = "last12";
       }
     } else {
-      state[type].selectedYear = "last12";
+      activityState.selectedYear = "last12";
     }
   }
 
   // Populate year selector
   if (yearSelect) {
-    const previousValue = state[type].selectedYear;
+    const previousValue = activityState.selectedYear;
     yearSelect.innerHTML = `<option value="last12">Last 12 Months</option>`;
     for (const yr of years) {
       yearSelect.innerHTML += `<option value="${yr}">${yr}</option>`;
@@ -300,10 +324,10 @@ function renderHeatmap(type) {
 
     if (!yearSelect.dataset.listenerAttached) {
       yearSelect.addEventListener("change", (e) => {
-        state[type].selectedYear = e.target.value;
-        state[type].selectedDate = null;
-        renderHeatmap(type);
-        renderFileList(type);
+        activityState.selectedYear = e.target.value;
+        activityState.selectedDate = null;
+        renderHeatmap();
+        renderAllFileLists();
       });
       yearSelect.dataset.listenerAttached = "true";
     }
@@ -312,7 +336,7 @@ function renderHeatmap(type) {
   // Determine range
   let startSun, endSat, totalWeeks, isYearMode = false, targetYear = null;
 
-  if (state[type].selectedYear === "last12") {
+  if (activityState.selectedYear === "last12") {
     let targetEnd = new Date();
     // If files are in future or recent
     if (fileDates.length > 0) {
@@ -328,7 +352,7 @@ function renderHeatmap(type) {
     totalWeeks = 53;
   } else {
     isYearMode = true;
-    targetYear = parseInt(state[type].selectedYear, 10);
+    targetYear = parseInt(activityState.selectedYear, 10);
     const jan1 = new Date(targetYear, 0, 1);
     startSun = new Date(targetYear, 0, 1 - jan1.getDay());
     const dec31 = new Date(targetYear, 11, 31);
@@ -338,7 +362,6 @@ function renderHeatmap(type) {
 
   // Calculate maxCount in view
   let maxCount = 0;
-  let totalFilesInRange = 0;
 
   for (let w = 0; w < totalWeeks; w++) {
     for (let d = 0; d < 7; d++) {
@@ -347,13 +370,11 @@ function renderHeatmap(type) {
       const dStr = formatDateISO(cur);
       const c = counts[dStr] || 0;
       if (c > maxCount) maxCount = c;
-      totalFilesInRange += c;
     }
   }
 
   // SVG dimensions
   const cellSize = 10;
-  const cellGap = 3;
   const leftMargin = 28;
   const topMargin = 16;
   const svgWidth = leftMargin + totalWeeks * 13 + 6;
@@ -371,8 +392,6 @@ function renderHeatmap(type) {
   let lastMonthPlacedCol = -5;
   for (let w = 0; w < totalWeeks; w++) {
     // Check if month changes in this week
-    const sunDate = new Date(startSun.getFullYear(), startSun.getMonth(), startSun.getDate() + w * 7);
-    const satDate = new Date(startSun.getFullYear(), startSun.getMonth(), startSun.getDate() + w * 7 + 6);
     
     // Find if 1st of month occurs in this week
     let monthLabel = null;
@@ -406,12 +425,12 @@ function renderHeatmap(type) {
       const fillColor = LEVEL_COLORS[level];
       const x = leftMargin + w * 13;
       const y = topMargin + d * 13;
-      const isSelected = state[type].selectedDate === dStr;
+      const isSelected = activityState.selectedDate === dStr;
       const selectedClass = isSelected ? " is-selected" : "";
       const strokeColor = isSelected ? "#0969da" : level === 0 ? "rgba(27, 31, 35, 0.08)" : "none";
       const strokeWidth = isSelected ? "2" : "1";
 
-      svg += `<rect class="heatmap-day${selectedClass}" data-type="${type}" data-date="${dStr}" data-count="${c}" data-level="${level}" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" ry="2" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"></rect>`;
+      svg += `<rect class="heatmap-day${selectedClass}" data-date="${dStr}" data-count="${c}" data-level="${level}" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" ry="2" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"></rect>`;
     }
   }
 
@@ -443,10 +462,11 @@ function renderHeatmap(type) {
       const dateStr = rect.getAttribute("data-date");
       const count = parseInt(rect.getAttribute("data-count"), 10);
       const formattedDate = formatTooltipDate(dateStr);
+      const breakdown = countsByType[dateStr] || { csv: 0, rerun: 0, raw: 0 };
       const message =
         count === 0
           ? `No files on ${formattedDate}`
-          : `${count} file${count > 1 ? "s" : ""} on ${formattedDate}`;
+          : `${count} file${count > 1 ? "s" : ""} on ${formattedDate} · CSV: ${breakdown.csv}, Rerun: ${breakdown.rerun}, Raw: ${breakdown.raw}`;
 
       if (heatmapTooltip) {
         const r = rect.getBoundingClientRect();
@@ -463,25 +483,17 @@ function renderHeatmap(type) {
 
     rect.addEventListener("click", () => {
       const dateStr = rect.getAttribute("data-date");
-      if (state[type].selectedDate === dateStr) {
-        state[type].selectedDate = null;
-      } else {
-        state[type].selectedDate = dateStr;
-      }
-      renderHeatmap(type);
-      renderFileList(type);
+      selectActivityDate(activityState.selectedDate === dateStr ? null : dateStr);
     });
   });
 
-  container.addEventListener("scroll", () => {
-    if (heatmapTooltip) heatmapTooltip.classList.remove("show");
-  });
-
-  // Update summary text
-  if (summarySpan) {
-    const periodLabel = state[type].selectedYear === "last12" ? "the past year" : state[type].selectedYear;
-    summarySpan.textContent = `${totalFilesInRange} file${totalFilesInRange === 1 ? "" : "s"} in ${periodLabel}`;
+  if (!container.dataset.scrollAttached) {
+    container.addEventListener("scroll", () => {
+      if (heatmapTooltip) heatmapTooltip.classList.remove("show");
+    });
+    container.dataset.scrollAttached = "true";
   }
+
 }
 
 function renderFileList(type) {
@@ -495,7 +507,7 @@ function renderFileList(type) {
   if (!list) return;
 
   const allFiles = state[type].files || [];
-  const selectedDate = state[type].selectedDate;
+  const selectedDate = activityState.selectedDate;
 
   // Set header file count badge
   if (fileCountBadge) {
@@ -505,9 +517,7 @@ function renderFileList(type) {
   // Configure clear button
   if (clearBtn && !clearBtn.dataset.listenerAttached) {
     clearBtn.addEventListener("click", () => {
-      state[type].selectedDate = null;
-      renderHeatmap(type);
-      renderFileList(type);
+      selectActivityDate(null);
     });
     clearBtn.dataset.listenerAttached = "true";
   }
@@ -562,7 +572,7 @@ function renderFileList(type) {
     const downloadA = document.createElement("a");
     downloadA.className = "btn btn-sm btn-outline-primary";
     downloadA.textContent = "Download";
-    downloadA.href = `/files/download/${encodeURIComponent(file.name)}`;
+    downloadA.href = `/files/download/${encodeURIComponent(file.name)}?type=${encodeURIComponent(type)}`;
     downloadA.setAttribute("download", "");
 
     li.appendChild(leftDiv);
@@ -571,11 +581,9 @@ function renderFileList(type) {
   }
 }
 
-      const downloadA = document.createElement("a");
-      downloadA.className = "btn btn-sm btn-outline-primary";
-      downloadA.textContent = "Download";
-      downloadA.href = `/files/download/${encodeURIComponent(file.name)}?type=${encodeURIComponent(type)}`;
-      downloadA.setAttribute("download", "");
+async function loadFiles(type) {
+  const list = document.getElementById(`${type}fileList`);
+  list.innerHTML = "";
 
   try {
     const res = await fetch(`/files?type=${type}`);
@@ -585,7 +593,6 @@ function renderFileList(type) {
     const files = await res.json();
     state[type].files = files;
 
-    renderHeatmap(type);
     renderFileList(type);
   } catch (err) {
     console.error(`Error loading ${type} files:`, err);
@@ -594,9 +601,9 @@ function renderFileList(type) {
 }
 
 async function loadAllFiles() {
-  loadFiles("csv");
-  loadFiles("rerun");
-  loadFiles("raw");
+  // Choose the initial period only after all three datasets have loaded.
+  await Promise.all(FILE_TYPES.map(loadFiles));
+  renderHeatmap();
 }
 
 loadAllFiles();
