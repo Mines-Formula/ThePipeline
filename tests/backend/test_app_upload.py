@@ -90,7 +90,7 @@ def test_upload_accepts_binpd_protobuf_capture(upload_app):
 
     assert response.status_code == 200
     files, _, _ = captured[-1]
-    assert files == [("capture.binpd", b"protobuf bytes")]
+    assert files == [("capture.binpb", b"protobuf bytes")]
 
 
 def test_protobuf_upload_defaults_to_bundled_mf26_v3_schema(upload_app):
