@@ -1,0 +1,61 @@
+name: Deploy to Fsaelinux
+
+on:
+  # Allows a maintainer to rerun the deployment manually.
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Update server and restart Compose
+    runs-on:
+      - self-hosted
+      - Linux
+      - fsaelinux
+
+    timeout-minutes: 15
+
+    steps:
+      - name: Update repository
+        working-directory: /srv/formula/ThePipeline
+        run: |
+          set -euo pipefail
+
+          git fetch --prune origin
+          git checkout main
+          git reset --hard origin/main
+
+          # The parent reset does not discard changes inside submodules.
+          # Clean them so stale/generated DBC files cannot prevent checkout.
+          git submodule foreach --recursive 'git reset --hard && git clean -ffd'
+          git submodule update --init --recursive --force
+
+      - name: Validate Docker Compose configuration
+        working-directory: /srv/formula/ThePipeline
+        run: |
+          set -euo pipefail
+          docker compose \
+            -f docker-compose.yml \
+            config --quiet
+
+      - name: Build and deploy
+        working-directory: /srv/formula/ThePipeline
+        run: |
+          set -euo pipefail
+          docker compose \
+            -f docker-compose.yml \
+            up --detach --build --remove-orphans
+
+      - name: Show deployment status
+        if: always()
+        working-directory: /srv/formula/ThePipeline
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            ps

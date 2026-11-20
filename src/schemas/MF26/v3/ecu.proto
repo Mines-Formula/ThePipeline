@@ -1,0 +1,184 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/timestamp.proto";
+
+message ECUData {
+  Timestamp timestamp = 1;
+
+  EngineData             engine                   = 2;
+  FuelData               fuel                     = 3;
+  IgnitionData           ignition                 = 4;
+  CutState               cut_state                = 5;
+  ExhaustLoadData        exhaust_load             = 6;
+  EngineStatus           engine_status            = 7;
+  EngineStates           states                   = 8;
+  DriverSwitches         driver_switches          = 9;
+  FlexFuelData           flex_fuel                = 10;
+  DualFuelData           dual_fuel                = 11;
+  BrakeSteeringPressures brake_steering_pressures = 12;
+  MassFlowShaftData      mass_flow_shaft_data     = 13;
+  ECUAcceleration        ecu_acceleration         = 14;
+  WheelSpeeds            wheel_speeds             = 15;
+  TempVoltageData        temp_voltage_data        = 16;
+}
+
+message EngineData {
+  double engine_speed_rpm            = 1;
+  double inlet_manifold_pressure_kpa = 2;
+  double inlet_air_temp_c            = 3;
+  double throttle_position           = 4;
+}
+
+message FuelData {
+  double fuel_volume                 = 1;
+  double fuel_mixture_aim            = 2;
+  double fuel_pressure_kpa           = 3;
+  double injector_primary_duty_cycle = 4;
+  double engine_efficiency           = 5;
+}
+
+message IgnitionData {
+  double throttle_pedal      = 1;
+  double engine_load         = 2;
+  double ignition_timing     = 3;
+  double fuel_timing_primary = 4;
+}
+
+message CutState {
+  uint32 ign_cut_count     = 1;
+  uint32 fuel_cut_count    = 2;
+  double ign_cut_avg       = 3;
+  double fuel_cut_avg      = 4;
+  double inj_pulse_width_1 = 5;
+  int32  ign_timing_state  = 6;
+  uint32 ign_cut_state     = 7;
+  double oil_pressure_kpa  = 8;
+}
+
+message ExhaustLoadData {
+  double exhaust_temp_c         = 1;
+  double engine_load_avg        = 2;
+  double engine_speed_limit_rpm = 3;
+  double ambient_pressure_kpa   = 4;
+}
+
+message TempVoltageData {
+  double coolant_temp_c = 1;
+  double oil_temp_c     = 2;
+  double fuel_temp_c    = 3;
+  double ambient_temp_c = 4;
+  double airbox_temp_c  = 5;
+  double ecu_voltage_v  = 6;
+  double fuel_used      = 7;
+}
+
+message EngineStatus {
+  uint32 engine_run_time_s = 1;
+  uint32 engine_uptime_s   = 2;
+  uint32 warning_source    = 3;
+
+  // Warning flags
+  bool warn_coolant_temp     = 4;
+  bool warn_coolant_pressure = 5;
+  bool warn_engine_speed     = 6;
+  bool warn_oil_temp         = 7;
+  bool warn_oil_pressure     = 8;
+  bool warn_crankcase        = 9;
+  bool warn_fuel_pressure    = 10;
+  bool warn_knock            = 11;
+}
+
+message EngineStates {
+  uint32 engine_state             = 1;
+  uint32 fuel_pump_state          = 2;
+  uint32 anti_lag_state           = 3;
+  uint32 launch_state             = 4;
+  uint32 boost_aim_state          = 5;
+  uint32 engine_over_run_state    = 6;
+  uint32 fuel_state               = 7;
+  uint32 knock_state              = 8;
+  uint32 throttle_aim_state       = 9;
+  uint32 close_loop_state         = 10;
+  uint32 gear                     = 11;
+  uint32 engine_reference_state   = 12;
+  uint32 engine_speed_limit_state = 13;
+}
+
+message DriverSwitches {
+  int32 anti_lag_diag   = 1;
+  int32 launch_diag     = 2;
+  int32 boost_ctrl_diag = 3;
+  int32 fuel_cut_state  = 4;
+  int32 cl_fuel_diag    = 5;
+  bool  oil_press_low   = 6;
+  bool  pit_switch      = 7;
+  bool  launch_switch   = 8;
+  bool  traction_switch = 9;
+  bool  brake_state     = 10;
+  bool  anti_lag_switch = 11;
+  bool  run_switch      = 12;
+  bool  neutral_switch  = 13;
+}
+
+message FlexFuelData {
+
+  double secondary_injector_contribution = 1;
+  double fuel_timing_secondary           = 2;
+  double injector_secondary_duty         = 3;
+
+  int32  flex_mode                   = 4;
+  int32  flex_diag                   = 5;
+  double flex_primary_timing_blend   = 6;
+  double flex_secondary_timing_blend = 7;
+  double flex_ign_blend              = 8;
+  double flex_mixture_blend          = 9;
+  double fuel_composition            = 10;
+  double flex_ignition               = 11;
+
+  double flex_primary_timing   = 12;
+  double flex_secondary_timing = 13;
+  double flex_mixture_aim      = 14;
+}
+
+message DualFuelData {
+  double alt_fuel_pressure_kpa  = 1;
+  double alt_fuel_temp_offset_c = 2;
+  double alt_fuel_efficiency    = 3;
+  int32  alt_pump_state         = 4;
+  bool   alt_press_warn         = 5;
+  bool   alt_pump_relay         = 6;
+}
+
+message MassFlowShaftData {
+
+  double steering_angle_deg = 1;
+  double inlet_mass_flow    = 2;
+  double airbox_mass_flow   = 3;
+  double fuel_flow          = 4;
+
+  double primary_diff_pressure   = 5;
+  double secondary_diff_pressure = 6;
+  double gear_input_speed        = 7;
+  double gear_output_speed       = 8;
+}
+
+message ECUAcceleration {
+  double accel_x = 1;
+  double accel_y = 2;
+  double accel_z = 3;
+}
+
+message BrakeSteeringPressures {
+  double brake_pressure_front_kpa = 1;
+  double brake_pressure_rear_kpa  = 2;
+  double coolant_pressure_kpa     = 3;
+  double steering_pressure_kpa    = 4;
+}
+
+message WheelSpeeds {
+  double wheel_speed_fl_rpm = 1;
+  double wheel_speed_fr_rpm = 2;
+  double wheel_speed_rl_rpm = 3;
+  double wheel_speed_rr_rpm = 4;
+}

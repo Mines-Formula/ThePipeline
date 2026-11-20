@@ -1,0 +1,27 @@
+syntax = "proto3";
+package MF26.v2;
+
+import "MF26/v2/timestamp.proto";
+
+//This message is so values can be logged and then
+//easily imported into InfluxDB
+message Measurement {
+  Timestamp timestamp = 1;
+  string name   = 2;  
+  double value  = 3;
+  string unit   = 4; 
+  string source = 5;
+}
+
+
+// A complete logged session — written to disk on the CM5 as a .pb file.
+// The off-car converter reads this and emits InfluxDB line protocol.
+message LoggedSession {
+  string session_id                    = 1;  // e.g. "2025-04-13_endurance_r1"
+  string car_id                        = 2;  // "IC_01" or "EV_01"
+  string driver                        = 4; // IDK if this makes sense 
+  Timestamp start_time = 5;
+  Timestamp end_time   = 6;
+
+  repeated Measurement measurements    = 7; //
+}

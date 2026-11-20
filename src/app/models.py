@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from collections import OrderedDict
 
@@ -9,6 +9,7 @@ class ConversionProgress:
     progress: str
     exception: Optional[Exception] = None
     finished: bool = False
+    metrics: dict = field(default_factory=dict)
 
     def pop_exception(self) -> Exception:
         if self.exception is None:

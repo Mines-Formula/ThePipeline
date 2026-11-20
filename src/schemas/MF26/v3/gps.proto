@@ -1,0 +1,24 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/timestamp.proto";
+
+message GPSData {
+  Timestamp timestamp = 1;
+
+  double latitude_deg           = 2;
+  double longitude_deg          = 3;
+  double speed_kmh              = 4;
+  double altitude_m             = 5;
+  uint32 gps_time               = 6; //HHMMSS.sss packed
+  uint32 date                   = 7; //DDMMYY packed
+  bool   valid                  = 8;
+  double true_course_deg        = 9;
+  double hdop                   = 10;
+  uint32 satellites             = 11;
+  double magnetic_variation_deg = 12;
+  uint32 dgps_station_id        = 13;
+  int32  faa_mode               = 14;
+  int32  fix_quality            = 15;
+  double wgs84_height_m         = 16;
+}

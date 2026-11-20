@@ -9,6 +9,20 @@ usable Unix times, so this code is not currently being used
 """
 
 
+def _parse_time_value(time_value: int) -> tuple[int, int, int]:
+    """
+    Logged GPS time values arrive as HHMMSS.sss with the decimal removed.
+    Pad from the left so short values like 1000 become 00:00:01.000.
+    """
+    raw_time = str(int(time_value)).zfill(9)
+    clock_time = raw_time[:-3]
+
+    hour = int(clock_time[0:2])
+    minute = int(clock_time[2:4])
+    second = int(clock_time[4:6])
+    return hour, minute, second
+
+
 def build_time_ref(file) -> float:
     # Read only needed cols for efficiency
     df = pd.read_csv(file)
@@ -21,27 +35,23 @@ def build_time_ref(file) -> float:
     Date: str = str(int(DateRow["Value"].iloc[-1]))
     Time: int = int(TimeRow["Value"].iloc[-1])
 
-    while (
-        len(Date) < 6
-    ):  # Edge case, if given 06/05/25 date value is "60525" convert to -> "060525"
+    # Edge case, if given 06/05/25 date value is "60525" convert to -> "060525"
+    while ( len(Date) < 6 ):  
         Date = "0" + Date
 
     day: int = int(Date[0:2])
     month: int = int(Date[2:4])
     year: int = int(Date[4:6]) + 2000
 
-    if (
-        int(str(Time)[0:2]) > 23
-    ):  # Edge case, if given 3113036044 (HHMMSS.sss) we know that the data was read wrong, as big endian instead of little
+    hour, minute, second = _parse_time_value(Time)
+
+    # Edge case, if the data was read with the wrong endianness, swap and parse again
+    if (hour > 23 or minute > 59 or second > 59):  
         n = int(Time).to_bytes(4, byteorder="little")
         Time = int.from_bytes(n, byteorder="big")
-        print(
-            f"Exception detected: time was read as big endian, switching to little endian"
-        )
+        print(f"Exception detected: time was read as big endian, switching to little endian")
+        hour, minute, second = _parse_time_value(Time)
 
-    hour: int = int(str(Time)[0:2])
-    minute: int = int(str(Time)[2:4])
-    second: int = int(str(Time)[4:6])
     ms: int = 0  # UNIX time doesn't need ms
     dt = datetime(year, month, day, hour, minute, second, 0)
     Unix_ms: float = dt.timestamp() * 1000

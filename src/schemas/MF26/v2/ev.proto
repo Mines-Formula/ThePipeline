@@ -1,0 +1,27 @@
+syntax = "proto3";
+package MF26.v2;
+
+import "MF26/v2/timestamp.proto";
+
+
+message EV{
+    Timestamp         timestamp         = 1;
+    InverterData      inverter          = 2;      
+    BMSData           bms               = 3;
+    double            mag_currnet_sens  = 4;
+    double            ev_coolant_temp   = 5;
+    double            ev_flow_rate      = 6;
+}
+
+
+message InverterData{
+
+}
+
+message BMSData{
+
+}
+
+
+
+

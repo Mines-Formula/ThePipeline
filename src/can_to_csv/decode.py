@@ -6,6 +6,8 @@ from pathlib import Path
 
 from constants import *
 
+from .filter_gps import filter_gps
+
 """
 @author Magnus Van Zyl
 Script to convert raw canbus data into readable data in a csv file in the format 'Timestamp,CANID,SENSOR,Value,Unit'.
@@ -119,6 +121,9 @@ def make_known(unknown_file_name: str, output_file_name: str):
                 unt = line[4][i]
                 data_entry = f"{time},{canbus_id},{sense},{val},{unt}\n"
                 file.write(data_entry)
+
+    # === FILTER OUT 'COLD-START' GPS DATA ===
+    filter_gps(output_file)
 
     print(f"DATA DECODED INTO FILE: {output_file}")
     print(f"LINES SKIPPED: {failed_lines}")

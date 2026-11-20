@@ -1,0 +1,85 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/timestamp.proto";
+import "MF26/v3/gps.proto";
+
+//This struct will be used by the STM32's to send data to the CM5
+
+message DAQData {
+  Timestamp timestamp = 1;
+
+  DAQAcceleration  accel              = 2;
+  DAQGyroscope     gyro               = 3;
+  DAQMagnetometer  mag                = 4;
+  BrakeTempData    brake_temps        = 5;
+  DAQBrakePressure brake_pressure     = 6;
+  double           steering_angle_deg = 7;
+  CurrentSensor    current            = 8;
+  ShockCompression shock              = 9;
+  RideHeight       ride_height        = 10;
+
+  string  node_id = 11;
+  GPSData gps     = 12;
+
+  double EV_Pedal_Position = 13;
+  double EV_Brake_Pressure = 14;
+  bool   EV_LatchingState  = 15;
+
+  bool BSPD_LatchingState = 16;
+
+}
+
+message DAQAcceleration {
+  double accel_x_g = 1;
+  double accel_y_g = 2;
+  double accel_z_g = 3;
+  double temp_c    = 4;
+}
+
+message DAQGyroscope {
+  double roll_x_dps = 1;
+  double roll_y_dps = 2;
+  double roll_z_dps = 3;
+  double temp_c     = 4;
+}
+
+message DAQMagnetometer {
+  double mag_x  = 1;
+  double mag_y  = 2;
+  double mag_z  = 3;
+  double temp_c = 4;
+}
+
+message BrakeTempData {
+  double brake_temp_fr_c = 1;
+  double brake_temp_fl_c = 2;
+  double brake_temp_rr_c = 3;
+  double brake_temp_rl_c = 4;
+}
+
+message DAQBrakePressure {
+  double front_kpa = 1;
+  double rear_kpa  = 2;
+}
+
+message CurrentSensor {
+  double voltage_out_v = 1;
+  double current_out_a = 2;
+}
+
+message ShockCompression {
+  double front_right_in = 1;
+  double front_left_in  = 2;
+  double rear_right_in  = 3;
+  double rear_left_in   = 4;
+}
+
+message RideHeight {
+  double front_a = 1;
+  double front_b = 2;
+  double front_c = 3;
+  double rear_a  = 4;
+  double rear_b  = 5;
+  double rear_c  = 6;
+}

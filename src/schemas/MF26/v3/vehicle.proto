@@ -1,0 +1,48 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/ecu.proto";
+import "MF26/v3/daq.proto";
+import "MF26/v3/gps.proto";
+import "MF26/v3/pdm.proto";
+import "MF26/v3/ev.proto";
+import "MF26/v3/timestamp.proto";
+
+message SteeringWheel{
+  Timestamp timestamp = 1;
+
+  int32 dialPos      = 2;
+  bool  button1State = 3;
+  bool  button2State = 4;
+  bool  button3State = 5;
+  bool  button4State = 6;
+
+}
+
+message VehicleState {
+  Timestamp timestamp = 1;
+  string    car_id    = 2;  // "IC_01" or "EV_01"
+
+  ECUData       ecu            = 3;
+  DAQData       daq            = 4;
+  GPSData       gps            = 5;
+  PDMData       pdm            = 6;
+  SteeringWheel steering_wheel = 7;
+  EVStatus      ev             = 8;
+
+}
+
+message CarFrame{
+  Timestamp timestamp = 1;
+  string    car_id    = 2;
+
+  oneof payload {
+    ECUData       ecu            = 3;
+    DAQData       daq            = 4;
+    GPSData       gps            = 5;
+    PDMData       pdm            = 6;
+    VehicleState  vehicle_state  = 7;
+    SteeringWheel steering_wheel = 8;
+    EVStatus      ev             = 9;
+  }
+}

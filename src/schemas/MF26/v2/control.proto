@@ -1,0 +1,12 @@
+syntax = "proto3";
+package MF26.v2;
+
+import "MF26/v2/timestamp.proto";
+
+message VCUCommand {
+    
+  Timestamp       timestamp           = 1;
+
+  repeated double torque_request_nm   = 3;
+
+}

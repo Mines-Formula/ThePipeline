@@ -1,0 +1,38 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/timestamp.proto";
+
+message VCUCommand {
+
+  Timestamp timestamp = 1;
+
+  repeated double torque_request_nm  = 3;
+  repeated int32  fan_speed_request  = 4;
+  repeated int32  pump_speed_request = 5;
+
+  double derate                  = 6;
+  double derate_battery_temp     = 7;
+  double derate_battery_charge   = 8;
+  double derate_inverter_temp    = 9;
+  double derate_inverter_current = 10;
+
+  bool shutdown = 11;
+
+  bool driveSound = 12;
+
+  repeated int32 radiator_speed_request = 13;
+
+  double speed_request_av          = 14; //angular velocity
+  bool   direction_command_request = 15; //0 = “Reverse” 1 = “Forward”
+  bool   inv_enable_request        = 16; //0 = Inverter Off, 1 = Inverter On
+  bool   inv_discharge_request     = 17;// 0 = Disable Discharge, 1 = Enable Discharge
+  bool   speed_mode_request        = 18; //0 = Do not over-ride mode 1 = If controller is in torque mode then
+  double commanded_torque_limit_nm = 19;
+  double rolling_counter           = 20;
+
+  int32 VCU_error_state = 21;
+
+  double dereate_battery_current = 22;
+
+}

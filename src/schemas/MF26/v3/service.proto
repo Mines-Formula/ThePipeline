@@ -1,0 +1,37 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/vehicle.proto";
+import "MF26/v3/control.proto";
+import "MF26/v3/daq.proto";
+import "MF26/v3/timestamp.proto";
+
+message Ack {
+  bool   ok      = 1;
+  string message = 2;
+}
+
+message StreamRequest  {
+  string car_id = 1;
+}
+
+message SessionRequest {
+  string session_id = 1;
+}
+
+message TimeSync {
+  Timestamp current_time = 1;
+  string    source       = 2;  // e.g. "gps", "ntp", "system"
+}
+
+service DataService {
+
+  rpc StreamTimeSync(StreamRequest)   returns (stream TimeSync);
+
+  rpc PushDAQData(DAQData)            returns (Ack);
+
+  rpc StreamCarFrames(StreamRequest)  returns (stream CarFrame);
+
+  rpc SendCommand(VCUCommand)         returns (Ack);
+
+}

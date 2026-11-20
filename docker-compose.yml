@@ -1,10 +1,11 @@
 services:
-  web: 
+  web:
     build:
       context: ./src
-    stop_signal: SIGINT
     ports:
-      - "6767:6767" 
+      - "6767:6767"
+    stop_signal: SIGINT
+    restart: unless-stopped
     volumes:
       - ./data:/data
     environment:

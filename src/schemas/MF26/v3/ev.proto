@@ -1,0 +1,387 @@
+syntax = "proto3";
+package MF26.v3;
+
+import "MF26/v3/timestamp.proto";
+// ==========================================
+// Global CAN Frame / Decoded State Wrapper
+// ==========================================
+
+message EVStatus {
+  Timestamp timestamp = 1;
+
+  EV_PWM_Control                 ev_pwm_control                 = 10;
+  BMS_BatteryPack                bms_battery_pack               = 11;
+  BMS_Module                     module1                        = 12;
+  BMS_Module                     module2                        = 13;
+  BMS_Module                     module3                        = 14;
+  BMS_Module                     module4                        = 15;
+  BMS_Module                     module5                        = 16;
+  M173_Modulation_And_Flux_Info  m173_modulation_and_flux_info  = 17;
+  M172_Torque_And_Timer_Info     m172_torque_and_timer_info     = 18;
+  M194_Read_Write_Param_Response m194_read_write_param_response = 19;
+  M193_Read_Write_Param_Command  m193_read_write_param_command  = 20;
+  // M192_Command_Message           m192_command_message           = 21;
+  M171_Fault_Codes            m171_fault_codes           = 22;
+  M170_Internal_States        m170_internal_states       = 23;
+  M169_Internal_Voltages      m169_internal_voltages     = 24;
+  M168_Flux_ID_IQ_Info        m168_flux_id_iq_info       = 25;
+  M167_Voltage_Info           m167_voltage_info          = 26;
+  M166_Current_Info           m166_current_info          = 27;
+  M165_Motor_Position_Info    m165_motor_position_info   = 28;
+  M164_Digital_Input_Status   m164_digital_input_status  = 29;
+  M163_Analog_Input_Voltages  m163_analog_input_voltages = 30;
+  M162_Temperature_Set_3      m162_temperature_set_3     = 31;
+  M161_Temperature_Set_2      m161_temperature_set_2     = 32;
+  M160_Temperature_Set_1      m160_temperature_set_1     = 33;
+  M174_Firmware_Info          m174_firmware_info         = 34;
+  M187_U2C_Command_Txd        m187_u2c_command_txd       = 35;
+  M188_U2C_Message_Rxd        m188_u2c_message_rxd       = 36;
+  BMS_Current_Limit           bms_current_limit          = 37;
+  M176_Fast_Info              m176_fast_info             = 38;
+  M175_Diag_Data_Message      m175_diag_data_message     = 39;
+  VECTOR__INDEPENDENT_SIG_MSG vector_independent_sig_msg = 40;
+  uint32                      bms_heartbeat              = 41;
+  uint32                      bms_error_state            = 42;
+  PRECHARGE_STATUS            pre_charge_status          = 43;
+}
+
+// ==========================================
+// Enums from VAL_ Table Definitions
+// ==========================================
+
+enum InverterState {
+  INVERTER_STATE_POWER_UP          = 0;
+  INVERTER_STATE_STOP              = 1;
+  INVERTER_STATE_OPEN_LOOP         = 2;
+  INVERTER_STATE_CLOSED_LOOP       = 3;
+  INVERTER_STATE_INTERNAL_STATE_4  = 4;
+  INVERTER_STATE_INTERNAL_STATE_5  = 5;
+  INVERTER_STATE_INTERNAL_STATE_6  = 6;
+  INVERTER_STATE_INTERNAL_STATE_7  = 7;
+  INVERTER_STATE_IDLE_RUN          = 8;
+  INVERTER_STATE_IDLE_STOP         = 9;
+  INVERTER_STATE_INTERNAL_STATE_10 = 10;
+  INVERTER_STATE_INTERN_STATE_11   = 11;
+  INVERTER_STATE_INTERNAL_STATE_12 = 12;
+}
+
+enum VSMState {
+  VSM_STATE_START                      = 0;
+  VSM_STATE_PRE_CHARGE_INIT            = 1;
+  VSM_STATE_PRE_CHARGE_ACTIVE          = 2;
+  VSM_STATE_PRE_CHARGE_COMPLETE        = 3;
+  VSM_STATE_WAIT                       = 4;
+  VSM_STATE_READY                      = 5;
+  VSM_STATE_MOTOR_RUNNING              = 6;
+  VSM_STATE_BLINK_FAULT_CODE           = 7;
+  VSM_STATE_SHUTDOWN_KEY_SWITCH_MODE_1 = 14;
+  VSM_STATE_RESET_INVERTER             = 15;
+}
+
+message PRECHARGE_STATUS{
+  bool precharge_state = 1;
+}
+
+// ==========================================
+// VCU & BMS Messages
+// ==========================================
+
+// CAN ID: 1024 (0x400)
+message EV_PWM_Control {
+  uint32 fan_speed_pct  = 1;  // %
+  uint32 pump_speed_pct = 2; // %
+}
+
+// CAN ID: 1028 (0x404)
+message BMS_BatteryPack {
+  float pack_max_temp_c = 1;
+  float pack_avg_temp_c = 2;
+  float charge_pct      = 3;
+  float current_a       = 4;
+}
+
+// Flattened representation of a complete BMS module state (G1 -> G24)
+message BMS_Module {
+  // Cell Group Voltages (Volts)
+  float voltage_g1  = 1;
+  float voltage_g2  = 2;
+  float voltage_g3  = 3;
+  float voltage_g4  = 4;
+  float voltage_g5  = 5;
+  float voltage_g6  = 6;
+  float voltage_g7  = 7;
+  float voltage_g8  = 8;
+  float voltage_g9  = 9;
+  float voltage_g10 = 10;
+  float voltage_g11 = 11;
+  float voltage_g12 = 12;
+  float voltage_g13 = 13;
+  float voltage_g14 = 14;
+  float voltage_g15 = 15;
+  float voltage_g16 = 16;
+  float voltage_g17 = 17;
+  float voltage_g18 = 18;
+  float voltage_g19 = 19;
+  float voltage_g20 = 20;
+  float voltage_g21 = 21;
+  float voltage_g22 = 22;
+  float voltage_g23 = 23;
+  float voltage_g24 = 24;
+
+  // Temperature Sensor Groups (°C)
+  uint32 temperature_g1  = 25;
+  uint32 temperature_g2  = 26;
+  uint32 temperature_g3  = 27;
+  uint32 temperature_g4  = 28;
+  uint32 temperature_g6  = 29;
+  uint32 temperature_g7  = 30;
+  uint32 temperature_g8  = 31;
+  uint32 temperature_g9  = 32;
+  uint32 temperature_g10 = 33;
+  uint32 temperature_g5  = 34;
+}
+
+// CAN ID: 514 (0x202)
+message BMS_Current_Limit {
+  uint32 max_discharge_current_a = 1;
+  uint32 max_charge_current_a    = 2;
+}
+
+// ==========================================
+// Inverter Messages (Cascadia Motion)
+// ==========================================
+
+// CAN ID: 173 (0xAD)
+message M173_Modulation_And_Flux_Info {
+  float iq_command_a            = 1;
+  float id_command_a            = 2;
+  float flux_weakening_output_a = 3;
+  float modulation_index        = 4;
+}
+
+// CAN ID: 172 (0xAC)
+message M172_Torque_And_Timer_Info {
+  float power_on_timer_sec  = 1;
+  float torque_feedback_nm  = 2;
+  float commanded_torque_nm = 3;
+}
+
+// CAN ID: 194 (0xC2)
+message M194_Read_Write_Param_Response {
+  bool   write_success              = 1;
+  int32  data_response              = 2;
+  uint32 parameter_address_response = 3;
+}
+
+// CAN ID: 193 (0xC1)
+message M193_Read_Write_Param_Command {
+  int32  data_command              = 1;
+  bool   read_write_command        = 2;
+  uint32 parameter_address_command = 3;
+}
+
+// CAN ID: 192 (0xC0)
+// message M192_Command_Message {
+//   bool   inverter_enable         = 1;
+//   bool   direction_command       = 2;
+//   int32  speed_command_rpm       = 3;
+//   float  torque_command_nm       = 4;
+//   bool   inverter_discharge      = 5;
+//   float  torque_limit_command_nm = 6;
+//   bool   speed_mode_enable       = 7;
+//   uint32 rolling_counter         = 8;
+// }
+
+// CAN ID: 171 (0xAB)
+message M171_Fault_Codes {
+  uint32 run_fault_hi  = 1;
+  uint32 post_fault_hi = 2;
+  uint32 run_fault_lo  = 3;
+  uint32 post_fault_lo = 4;
+}
+
+// CAN ID: 170 (0xAA)
+message M170_Internal_States {
+  bool          direction_command        = 1;
+  bool          inverter_enable_state    = 2;
+  bool          relay_3_status           = 3;
+  bool          relay_4_status           = 4;
+  bool          relay_2_status           = 5;
+  bool          inverter_run_mode        = 6;
+  bool          inverter_command_mode    = 7;
+  bool          relay_1_status           = 8;
+  InverterState inverter_state           = 9;
+  VSMState      vsm_state                = 10;
+  bool          inverter_enable_lockout  = 11;
+  uint32        inverter_discharge_state = 12;
+  bool          relay_5_status           = 13;
+  bool          relay_6_status           = 14;
+  bool          bms_active               = 15;
+  bool          bms_torque_limiting      = 16;
+  bool          max_speed_limiting       = 17;
+  bool          low_speed_limiting       = 18;
+  uint32        rolling_counter          = 19;
+  uint32        pwm_frequency_khz        = 20;
+  bool          start_mode_active        = 21;
+}
+
+// CAN ID: 169 (0xA9)
+message M169_Internal_Voltages {
+  float reference_voltage_12_0_v = 1;
+  float reference_voltage_5_0_v  = 2;
+  float reference_voltage_2_5_v  = 3;
+  float reference_voltage_1_5_v  = 4;
+}
+
+// CAN ID: 168 (0xA8)
+message M168_Flux_ID_IQ_Info {
+  float iq_a             = 1;
+  float id_a             = 2;
+  float flux_feedback_wb = 3;
+  float flux_command_wb  = 4;
+}
+
+// CAN ID: 167 (0xA7)
+message M167_Voltage_Info {
+  float vbc_vq_voltage_v = 1;
+  float vab_vd_voltage_v = 2;
+  float output_voltage_v = 3;
+  float dc_bus_voltage_v = 4;
+}
+
+// CAN ID: 166 (0xA6)
+message M166_Current_Info {
+  float dc_bus_current_a  = 1;
+  float phase_c_current_a = 2;
+  float phase_b_current_a = 3;
+  float phase_a_current_a = 4;
+}
+
+// CAN ID: 165 (0xA5)
+message M165_Motor_Position_Info {
+  float delta_resolver_filtered_deg    = 1;
+  float electrical_output_frequency_hz = 2;
+  int32 motor_speed_rpm                = 3;
+  float motor_angle_electrical_deg     = 4;
+}
+
+// CAN ID: 164 (0xA4)
+message M164_Digital_Input_Status {
+  bool digital_input_1 = 1;
+  bool digital_input_2 = 2;
+  bool digital_input_3 = 3;
+  bool digital_input_4 = 4;
+  bool digital_input_5 = 5;
+  bool digital_input_6 = 6;
+  bool digital_input_7 = 7;
+  bool digital_input_8 = 8;
+}
+
+// CAN ID: 163 (0xA3)
+message M163_Analog_Input_Voltages {
+  float analog_input_1_v = 1;
+  float analog_input_2_v = 2;
+  float analog_input_3_v = 3;
+  float analog_input_4_v = 4;
+  float analog_input_5_v = 5;
+  float analog_input_6_v = 6;
+}
+
+// CAN ID: 162 (0xA2)
+message M162_Temperature_Set_3 {
+  float torque_shudder_nm   = 1;
+  float motor_temperature_c = 2;
+  float rtd5_temperature_c  = 3;
+  float rtd4_temperature_c  = 4;
+}
+
+// CAN ID: 161 (0xA1)
+message M161_Temperature_Set_2 {
+  float rtd3_temperature_c          = 1;
+  float rtd2_temperature_c          = 2;
+  float rtd1_temperature_c          = 3;
+  float control_board_temperature_c = 4;
+}
+
+// CAN ID: 160 (0xA0)
+message M160_Temperature_Set_1 {
+  float gate_driver_board_c = 1;
+  float module_c_c          = 2;
+  float module_b_c          = 3;
+  float module_a_c          = 4;
+}
+
+// CAN ID: 174 (0xAE)
+message M174_Firmware_Info {
+  uint32 project_code_eep_ver = 1;
+  uint32 sw_version           = 2;
+  uint32 datecode_mmdd        = 3;
+  uint32 datecode_yyyy        = 4;
+}
+
+// CAN ID: 176 (0xB0)
+message M176_Fast_Info {
+  float fast_torque_command_nm  = 1;
+  float fast_torque_feedback_nm = 2;
+  int32 fast_motor_speed_rpm    = 3;
+  float fast_dc_bus_voltage_v   = 4;
+}
+
+// Flattened representation of Inverter Diagnostic Data
+// CAN ID: 175 (0xAF)
+message M175_Diag_Data_Message {
+  uint32 diag_record             = 1;
+  float  diag_gamma_resolver_deg = 2;
+  float  diag_gamma_observer_deg = 3;
+  float  diag_sin_v              = 4;
+  float  diag_cos_v              = 5;
+  float  diag_ia_a               = 6;
+  float  diag_ib_a               = 7;
+  float  diag_ic_a               = 8;
+  float  diag_vdc_v              = 9;
+  float  diag_iq_cmd_a           = 10;
+  float  diag_id_cmd_a           = 11;
+  float  diag_mod_index          = 12;
+  float  diag_fw_output_a        = 13;
+  float  diag_vq_cmd_v           = 14;
+  float  diag_vd_cmd_v           = 15;
+  float  diag_vqs_cmd_v          = 16;
+  float  diag_12v_v              = 17;
+  uint32 diag_run_faults_lo      = 18;
+  uint32 diag_run_faults_hi      = 19;
+}
+
+// ==========================================
+// U2C (Delphi DC/DC Converter) Messages
+// ==========================================
+
+// CAN ID: 471 (0x1D7)
+message M187_U2C_Command_Txd {
+  uint32 u2c_id_byte       = 1;
+  uint32 u2c_setpoint_calc = 2;
+}
+
+// CAN ID: 469 (0x1D5)
+message M188_U2C_Message_Rxd {
+  bool   hv_input_current_sensor_validity = 1;
+  bool   master_14v_fault                 = 2;
+  uint32 hv_input_current                 = 3;
+  uint32 dtc_status                       = 4;
+  uint32 dtc_index                        = 5;
+  uint32 monitor_14v                      = 6;
+  bool   conditional_14v                  = 7;
+  uint32 current_monitor_14v              = 8;
+}
+
+// ==========================================
+// Vector / Diagnostic Signal Groups
+// ==========================================
+
+// CAN ID: 3221225472
+message VECTOR__INDEPENDENT_SIG_MSG {
+  uint32 inv_buffer_record  = 1;
+  uint32 inv_buffer_segment = 2;
+  int32  inv_diag_data_1    = 3;
+  int32  inv_diag_data_2    = 4;
+  int32  inv_diag_data_3    = 5;
+}

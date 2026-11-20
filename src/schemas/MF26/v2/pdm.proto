@@ -1,0 +1,51 @@
+syntax = "proto3";
+package MF26.v2;
+
+import "MF26/v2/timestamp.proto";
+
+// All signals decoded from PDM CAN frames 1280–1283.
+// PDM uses multiplexed frames — CM5 decoder resolves the
+// CompoundID multiplexing before populating this message.
+
+message PDMData {
+  Timestamp timestamp                 = 1;
+
+  double total_current                = 2; 
+
+  PDMChannelCurrents  currents        = 3; 
+  PDMChannelVoltages  voltages        = 4;
+}
+
+message PDMChannelCurrents {
+  double shift_down_1_a               = 1;
+  double shift_down_2_a               = 2;
+  double shift_up_1_a                 = 3;
+  double shift_up_2_a                 = 4;
+  double fuel_pump_a                  = 5;
+  double water_pump_a                 = 6;
+  double fan_a                        = 7;
+  double injector_a                   = 8;
+  double ecu_a                        = 9;
+  double rdaq_a                       = 10;
+  double bspd_a                       = 11;
+  double flex_fuel_a                  = 12;
+  double lambda_a                     = 13;
+  double coil_a                       = 14;
+}
+
+message PDMChannelVoltages {
+  double shift_down_1_v               = 1;
+  double shift_down_2_v               = 2;
+  double shift_up_1_v                 = 3;
+  double shift_up_2_v                 = 4;
+  double fuel_pump_v                  = 5;
+  double water_pump_v                 = 6;
+  double fan_v                        = 7;
+  double injector_v                   = 8;
+  double ecu_v                        = 9;
+  double rdaq_v                       = 10;
+  double bspd_v                       = 11;
+  double flex_fuel_v                  = 12;
+  double lambda_v                     = 13;
+  double coil_v                       = 14;
+}

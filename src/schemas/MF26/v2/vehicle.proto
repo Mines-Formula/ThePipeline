@@ -1,0 +1,34 @@
+syntax = "proto3";
+package MF26.v2;
+
+import "MF26/v2/ecu.proto";
+import "MF26/v2/daq.proto";
+import "MF26/v2/gps.proto";
+import "MF26/v2/pdm.proto";
+import "MF26/v2/timestamp.proto";
+
+
+message VehicleState {
+  Timestamp timestamp = 1;
+  string car_id                       = 2;  // "IC_01" or "EV_01"
+
+  ECUData   ecu                       = 3;
+  DAQData   daq                       = 4;
+  GPSData   gps                       = 5;
+  PDMData   pdm                       = 6;
+
+ 
+}
+
+message CarFrame{
+  Timestamp timestamp                 = 1;
+  string car_id                       = 2;
+
+  oneof payload {
+    ECUData      ecu                  = 3;
+    DAQData      daq                  = 4;
+    GPSData      gps                  = 5;
+    PDMData      pdm                  = 6;
+    VehicleState vehicle_state        = 7;
+  }
+}
