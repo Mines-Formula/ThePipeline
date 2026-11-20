@@ -384,28 +384,32 @@ def convert_file(
         )
         paths_to_update = (
             raw_data_path,
-            unknown_data_path,
             csv_path,
             line_path,
             unix_time_csv_path,
             RERUN_DIR / f"{csv_path.stem}.rrd",
         )
 
-        if unix_time_csv_path.exists():
-            timestamp = extract_first_timestamp(unix_time_csv_path)
-            app.logger.info("Extracted timestamp: %s", timestamp)
-        else:
-            timestamp = None
-            app.logger.error("Unix time CSV missing: %s", unix_time_csv_path)
+        try:
+            if unix_time_csv_path.exists():
+                timestamp = extract_first_timestamp(unix_time_csv_path)
+                app.logger.info("Extracted timestamp: %s", timestamp)
+            else:
+                timestamp = None
+                app.logger.error("Unix time CSV missing: %s", unix_time_csv_path)
 
-        if timestamp is not None:
-            app.logger.info("Updating timestamps...")
-            update_file_timestamps(paths_to_update, timestamp)
-        else:
-            app.logger.error(
-                "Failed to find valid timestamp for: %s",
-                unix_time_csv_path,
-            )
+            if timestamp is not None:
+                app.logger.info("Updating timestamps...")
+                update_file_timestamps(paths_to_update, timestamp)
+            else:
+                app.logger.error(
+                    "Failed to find valid timestamp for: %s",
+                    unix_time_csv_path,
+                )
+        except Exception as exec:
+            conversion_progress.exception = exec
+            conversion_progress.finished = True
+            return
 
         conversion_progress.progress = "done"
         conversion_progress.finished = True
