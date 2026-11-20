@@ -17,18 +17,24 @@ def esc_tag(s: str) -> str:
     return esc_measure(s)
 
 
-def convert_to_lineprotocol(FILE_NAME: str, FILE_OUTPUT: str):
+def convert_to_lineprotocol(
+    FILE_NAME: str, FILE_OUTPUT: str, absolute_timestamps: bool = False
+):
     """
     Converts csv to line protocol
 
     :param FILE_NAME: Name of Input File
     :param FILE_OUTPUT: Name of Output File
+    :param absolute_timestamps: True when the CSV timestamps are already Unix
+        epoch milliseconds and must not be shifted by a reference time
     """
 
     # convert input CSV to Unix Time
     FILE_NAME_BASE, ending = os.path.splitext(FILE_NAME)
     FILE_NAME_UNIX = FILE_NAME_BASE + "_unixtime" + ending
-    convert_unix_time.convert_to_unix(FILE_NAME, FILE_NAME_UNIX)
+    convert_unix_time.convert_to_unix(
+        FILE_NAME, FILE_NAME_UNIX, absolute_timestamps=absolute_timestamps
+    )
 
     with open(FILE_OUTPUT, "w", encoding="utf-8", newline="\n") as out:
         df = pd.read_csv(FILE_NAME_UNIX)
