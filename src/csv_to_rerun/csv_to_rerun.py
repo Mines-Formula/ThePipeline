@@ -70,7 +70,12 @@ def convert(input_path: Path, output_dir: Path) -> None:
 
     rr.save(output_dir / Path(input_path.stem + ".rrd"))
 
-    log_data(df)
+    try:
+        log_data(df)
 
-    if has_gps(df):
-        log_gps(df)
+        if has_gps(df):
+            log_gps(df)
+    finally:
+        # Flush and close the .rrd file so nothing writes to it after we
+        # return; otherwise a late flush overwrites the mtime the caller sets.
+        rr.disconnect()
