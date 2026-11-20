@@ -58,16 +58,21 @@ def build_time_ref(file) -> float:
     return Unix_ms
 
 
-def convert_to_unix(FILE_NAME: str, FILE_OUTPUT: str):
+def convert_to_unix(
+    FILE_NAME: str, FILE_OUTPUT: str, absolute_timestamps: bool = False
+):
     """
     Takes input csv and converts timestamps into UNIX time format
 
     :param FILE_NAME: Name of input file
     :param FILE_OUTPUT: Name of output file
+    :param absolute_timestamps: True when the Timestamp column already holds
+        Unix epoch milliseconds (protobuf captures), so no reference time is
+        added. CAN logs hold milliseconds since boot and need the offset.
     """
 
     # Build the reference mapping once (optimization to make code run faster)
-    time_ref: float = build_time_ref(FILE_NAME)
+    time_ref: float = 0 if absolute_timestamps else build_time_ref(FILE_NAME)
     header_written = False
     for chunk in pd.read_csv(
         FILE_NAME,

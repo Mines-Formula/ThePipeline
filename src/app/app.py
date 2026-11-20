@@ -344,10 +344,18 @@ def convert_file(
             )
             conversion_progress.progress = "csv_to_influxdb"
 
+        # Protobuf frames carry Unix epoch timestamps; CAN logs carry
+        # milliseconds since boot and need a reference time added.
+        is_protobuf = resolved_input_config.input_format in {
+            InputFormat.PROTOBUF_BINARY,
+            InputFormat.PROTOBUF_DELIMITED,
+        }
+
         try:
             line_protocol.convert_to_lineprotocol(
                 str(csv_path.resolve()),
                 str(line_path.resolve()),
+                absolute_timestamps=is_protobuf,
             )
         except Exception as exec:
             conversion_progress.exception = exec

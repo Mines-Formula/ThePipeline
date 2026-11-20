@@ -93,6 +93,24 @@ def test_convert_to_unix_shifts_timestamps(tmp_path):
     assert speed_ts == expected_ref + 500
 
 
+def test_convert_to_unix_keeps_absolute_timestamps(tmp_path):
+    f_in = tmp_path / "data.csv"
+    f_out = tmp_path / "out.csv"
+    epoch_ms = 1795198656302
+    pd.DataFrame(
+        {
+            "Timestamp": [epoch_ms, epoch_ms + 1000],
+            "CANID": ["IC_01", "IC_01"],
+            "Sensor": ["vehicle_state.daq.speed", "vehicle_state.daq.speed"],
+            "Value": ["7.63", "7.54"],
+            "Unit": ["", ""],
+        }
+    ).to_csv(f_in, index=False)
+    convert_to_unix(str(f_in), str(f_out), absolute_timestamps=True)
+    result = pd.read_csv(f_out)
+    assert list(result["Timestamp"]) == [epoch_ms, epoch_ms + 1000]
+
+
 def test_convert_to_unix_produces_output_file(tmp_path):
     f_in = tmp_path / "data.csv"
     f_out = tmp_path / "out.csv"
