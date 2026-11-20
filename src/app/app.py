@@ -77,7 +77,7 @@ def get_progress():
 
 
 def allowed_file(filename: str) -> bool:
-    return filename.lower().endswith((".data", ".bin", ".pb", ".protobuf", ".binpd"))
+    return filename.lower().endswith((".data", ".bin", ".pb", ".protobuf", ".binpb"))
 
 
 def allowed_schema_file(filename: str) -> bool:
