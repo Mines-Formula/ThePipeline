@@ -10,6 +10,8 @@ from flask import Flask, jsonify, render_template, request
 from pathlib import Path
 from pathlib import PurePosixPath
 from datetime import datetime
+import os
+import pandas as pd
 
 from csv_to_influxdb import line_protocol, write_to_influxDB
 from csv_to_rerun import csv_to_rerun
@@ -207,6 +209,40 @@ def convert_files(files, schema_data=None, **kwargs: Any):
             convert_file(file_like, **kwargs)
 
 
+def extract_first_timestamp(csv_path: Path) -> float | None:
+    """Return the first timestamp found in the CSV as seconds since epoch."""
+    try:
+        df = pd.read_csv(csv_path, usecols=["Timestamp"], nrows=1, dtype=str)
+
+        if df.empty:
+            return None
+
+        timestamp_raw = df.loc[0, "Timestamp"]
+
+        if pd.isna(timestamp_raw):
+            return None
+
+        timestamp_numeric = pd.to_numeric(timestamp_raw, errors="coerce")
+
+        if pd.isna(timestamp_numeric):
+            return None
+
+        timestamp_int = int(timestamp_numeric)
+
+        return timestamp_int / 1000 if timestamp_int > 10**12 else float(timestamp_int)
+    except (FileNotFoundError, ValueError, KeyError, pd.errors.EmptyDataError):
+        return None
+
+
+def update_file_timestamps(paths: tuple[Path, ...], timestamp: float) -> None:
+    """Set mtime/atime on all existing paths in the tuple."""
+    for path in paths:
+        if path.exists():
+            os.utime(path, (timestamp, timestamp))
+        else:
+            app.logger.error("Path does not exist when it should: %s", path)
+
+
 def _safe_schema_path(filename: str) -> Path:
     """Convert a browser-provided relative filename into a safe local path."""
     normalized = filename.replace("\\", "/")
@@ -276,6 +312,7 @@ def convert_file(
     with tempfile.TemporaryDirectory() as temporary_directory:
         parent_path = Path(temporary_directory)
         raw_data_path = RAW_DIR / raw_data_filename
+        payload_path = raw_data_path
         csv_path = CSV_DIR / csv_filename
         line_path = parent_path / line_filename
 
@@ -340,9 +377,38 @@ def convert_file(
             conversion_progress.exception = exec
             conversion_progress.finished = True
             return
+
+        conversion_progress.progress = "updating files timestamp"
+        unix_time_csv_path = csv_path.with_name(
+            csv_path.stem + "_unixtime" + csv_path.suffix
+        )
+        paths_to_update = (
+            raw_data_path,
+            unknown_data_path,
+            csv_path,
+            line_path,
+            unix_time_csv_path,
+            RERUN_DIR / f"{csv_path.stem}.rrd",
+        )
+
+        if unix_time_csv_path.exists():
+            timestamp = extract_first_timestamp(unix_time_csv_path)
+            app.logger.info("Extracted timestamp: %s", timestamp)
         else:
-            conversion_progress.progress = "done"
-            conversion_progress.finished = True
+            timestamp = None
+            app.logger.error("Unix time CSV missing: %s", unix_time_csv_path)
+
+        if timestamp is not None:
+            app.logger.info("Updating timestamps...")
+            update_file_timestamps(paths_to_update, timestamp)
+        else:
+            app.logger.error(
+                "Failed to find valid timestamp for: %s",
+                unix_time_csv_path,
+            )
+
+        conversion_progress.progress = "done"
+        conversion_progress.finished = True
 
 
 def _input_config_from_form(form, schema_file=None) -> InputConfig:
