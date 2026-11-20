@@ -82,7 +82,7 @@ def test_upload_accepts_binpd_protobuf_capture(upload_app):
     response = client.post(
         "/upload",
         data={
-            "files": (io.BytesIO(b"protobuf bytes"), "capture.binpd"),
+            "files": (io.BytesIO(b"protobuf bytes"), "capture.binpb"),
             "input_format": "protobuf_delimited",
         },
         content_type="multipart/form-data",

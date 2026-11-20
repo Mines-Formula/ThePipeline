@@ -100,7 +100,7 @@ class TestPageStructure:
 
     def test_file_input_accepts_data_extension(self, page: Page, server_url):
         expect(page.locator("#fileInput")).to_have_attribute(
-            "accept", ".data,.bin,.pb,.protobuf,.binpd"
+            "accept", ".data,.bin,.pb,.protobuf,.binpb"
         )
 
     def test_file_input_allows_multiple(self, page: Page, server_url):
