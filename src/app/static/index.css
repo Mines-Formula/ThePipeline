@@ -296,3 +296,58 @@ main {
     border-color: #0969da;
     box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
 }
+
+/* ==========================================================================
+   Vehicle Type Filter & Badges (All / IC / EV / Unknown)
+   ========================================================================== */
+
+.vehicle-filter-group .btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    font-weight: 600;
+}
+
+#vehicleFilterAll:checked + .btn {
+    background-color: var(--accent-navy);
+    border-color: var(--accent-navy);
+    color: #ffffff;
+}
+
+#vehicleFilterIC:checked + .btn {
+    background-color: var(--accent-orange);
+    border-color: var(--accent-orange);
+    color: #ffffff;
+}
+
+#vehicleFilterEV:checked + .btn {
+    background-color: #198754;
+    border-color: #198754;
+    color: #ffffff;
+}
+
+.vehicle-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+}
+
+.vehicle-badge-ev {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.vehicle-badge-ic {
+    background-color: #ffe8df;
+    color: #b43b15;
+}
+
+.vehicle-badge-unknown {
+    background-color: #fff3cd;
+    color: #664d03;
+    cursor: pointer;
+}
+
+.vehicle-badge-unknown:hover {
+    background-color: #ffecb5;
+}

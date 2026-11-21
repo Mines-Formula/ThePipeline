@@ -107,7 +107,19 @@
             <section class="card shadow-sm mb-3 text-start" id="activityCard" aria-label="File activity">
                 <div class="px-3 pt-2 pb-1 d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <span class="fw-semibold">Activity</span>
-                    <select class="form-select form-select-sm heatmap-year-select" id="activityYearSelect" aria-label="Select year for activity heatmap"></select>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="btn-group btn-group-sm vehicle-filter-group" role="group" aria-label="Filter files by vehicle type" id="vehicleFilterGroup">
+                            <input type="radio" class="btn-check" name="vehicleFilter" id="vehicleFilterAll" value="all" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary" for="vehicleFilterAll">All</label>
+
+                            <input type="radio" class="btn-check" name="vehicleFilter" id="vehicleFilterIC" value="ic" autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="vehicleFilterIC">IC</label>
+
+                            <input type="radio" class="btn-check" name="vehicleFilter" id="vehicleFilterEV" value="ev" autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="vehicleFilterEV">EV</label>
+                        </div>
+                        <select class="form-select form-select-sm heatmap-year-select" id="activityYearSelect" aria-label="Select year for activity heatmap"></select>
+                    </div>
                 </div>
                 <div id="activityHeatmap" class="file-heatmap px-3"></div>
                 <div class="px-3 pb-2 d-flex justify-content-end align-items-center">
@@ -179,6 +191,28 @@
         <!-- Shared Floating Tooltip for Heatmaps -->
         <div id="heatmapTooltip" class="heatmap-tooltip" role="tooltip"></div>
     </main>
+
+    <!-- Manual Vehicle Classification Modal -->
+    <div class="modal fade" id="classifyModal" tabindex="-1" aria-labelledby="classifyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-semibold" id="classifyModalLabel">Classify Telemetry File</h5>
+                    <button type="button" class="btn-close" id="classifyModalCloseX" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        The following telemetry run(s) could not be automatically labeled as IC or EV. Choose the car for each file below.
+                    </p>
+                    <div id="classifyModalError" class="alert alert-danger py-2 px-3 small d-none" role="alert"></div>
+                    <ul id="classifyModalList" class="list-group"></ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="classifyModalCloseBtn" data-bs-dismiss="modal">Close / Leave Unknown</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='index.js') }}"></script>

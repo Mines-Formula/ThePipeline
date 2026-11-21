@@ -697,3 +697,271 @@ class TestActivityHeatmaps:
         pending[0].fulfill(status=200, content_type="application/json", body=_TWO_FILES)
         expect(page.locator("#activityYearSelect")).to_have_value("2024")
         expect(page.locator("#activityHeatmap rect[data-date='2024-01-15']")).to_have_attribute("data-count", "1")
+
+
+'''
+Vehicle Filtering (All / IC / EV) & Unknown Classification Modal
+'''
+
+_MIXED_VEHICLE_FILES = {
+    "csv": [
+        {
+            "name": "ic_endurance.csv",
+            "run_id": "ic_endurance",
+            "timestamp": "2024-01-15 10:00:00",
+            "size": 2048,
+            "vehicle_type": "ic",
+        },
+        {
+            "name": "ev_skidpad.csv",
+            "run_id": "ev_skidpad",
+            "timestamp": "2024-01-15 11:00:00",
+            "size": 4096,
+            "vehicle_type": "ev",
+        },
+        {
+            "name": "mystery_run.csv",
+            "run_id": "mystery_run",
+            "timestamp": "2024-01-14 09:00:00",
+            "size": 1024,
+            "vehicle_type": "unknown",
+        },
+    ],
+    "rerun": [
+        {
+            "name": "ic_endurance.rrd",
+            "run_id": "ic_endurance",
+            "timestamp": "2024-01-15 10:00:00",
+            "size": 2048,
+            "vehicle_type": "ic",
+        },
+        {
+            "name": "ev_skidpad.rrd",
+            "run_id": "ev_skidpad",
+            "timestamp": "2024-01-15 11:00:00",
+            "size": 4096,
+            "vehicle_type": "ev",
+        },
+    ],
+    "raw": [
+        {
+            "name": "raw_ic_endurance.data",
+            "run_id": "ic_endurance",
+            "timestamp": "2024-01-15 10:00:00",
+            "size": 1024,
+            "vehicle_type": "ic",
+        },
+        {
+            "name": "raw_ev_skidpad.data",
+            "run_id": "ev_skidpad",
+            "timestamp": "2024-01-15 11:00:00",
+            "size": 2048,
+            "vehicle_type": "ev",
+        },
+    ],
+}
+
+
+def _route_mixed_files(page: Page, state_map=None) -> None:
+    files_by_type = state_map if state_map is not None else _MIXED_VEHICLE_FILES
+
+    def handler(route):
+        url = route.request.url
+        for kind in ("csv", "rerun", "raw"):
+            if f"type={kind}" in url:
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=json.dumps(files_by_type[kind]),
+                )
+                return
+        route.fulfill(status=200, content_type="application/json", body=_EMPTY)
+
+    page.route("**/files?*", handler)
+
+
+class TestVehicleFilter:
+    @pytest.mark.usefixtures("setup_empty_files_page")
+    def test_vehicle_filter_defaults_to_all(self, page: Page, server_url):
+        expect(page.locator("#vehicleFilterGroup")).to_be_visible()
+        expect(page.locator("#vehicleFilterAll")).to_be_checked()
+        expect(page.locator("#vehicleFilterIC")).not_to_be_checked()
+        expect(page.locator("#vehicleFilterEV")).not_to_be_checked()
+
+    def test_vehicle_filter_updates_lists_counts_and_heatmap(self, page: Page, server_url):
+        _route_mixed_files(page)
+        _goto(page, server_url)
+
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(3)
+        expect(page.locator("#csvFileCount")).to_have_text("3 files")
+        expect(page.locator("#activityHeatmap rect[data-date='2024-01-15']")).to_have_attribute(
+            "data-count", "6"
+        )
+        expect(page.locator("#activityHeatmap rect[data-date='2024-01-14']")).to_have_attribute(
+            "data-count", "1"
+        )
+
+        # Filter to EV
+        page.locator("label[for='vehicleFilterEV']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+        expect(page.locator("#csvfileList")).to_contain_text("ev_skidpad.csv")
+        expect(page.locator("#csvfileList")).not_to_contain_text("ic_endurance.csv")
+        expect(page.locator("#csvfileList")).not_to_contain_text("mystery_run.csv")
+        expect(page.locator("#csvFileCount")).to_have_text("1 file")
+        expect(page.locator("#rerunFileCount")).to_have_text("1 file")
+        expect(page.locator("#rawFileCount")).to_have_text("1 file")
+        expect(page.locator("#activityHeatmap rect[data-date='2024-01-15']")).to_have_attribute(
+            "data-count", "3"
+        )
+        expect(page.locator("#activityHeatmap rect[data-date='2024-01-14']")).to_have_attribute(
+            "data-count", "0"
+        )
+
+        # Filter to IC
+        page.locator("label[for='vehicleFilterIC']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+        expect(page.locator("#csvfileList")).to_contain_text("ic_endurance.csv")
+        expect(page.locator("#csvfileList")).not_to_contain_text("ev_skidpad.csv")
+
+        # Return to All
+        page.locator("label[for='vehicleFilterAll']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(3)
+
+    def test_vehicle_filter_composes_with_heatmap_date_selection(self, page: Page, server_url):
+        _route_mixed_files(page)
+        _goto(page, server_url)
+
+        page.locator("#activityHeatmap rect[data-date='2024-01-15']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(2)
+
+        page.locator("label[for='vehicleFilterEV']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+        expect(page.locator("#csvfileList")).to_contain_text("ev_skidpad.csv")
+
+        page.locator("label[for='vehicleFilterIC']").click()
+        expect(page.locator("#csvfileList li.list-group-item")).to_have_count(1)
+        expect(page.locator("#csvfileList")).to_contain_text("ic_endurance.csv")
+
+    def test_empty_state_when_no_ev_files_exist(self, page: Page, server_url):
+        ic_only = {
+            "csv": [_MIXED_VEHICLE_FILES["csv"][0]],
+            "rerun": [_MIXED_VEHICLE_FILES["rerun"][0]],
+            "raw": [_MIXED_VEHICLE_FILES["raw"][0]],
+        }
+        _route_mixed_files(page, ic_only)
+        _goto(page, server_url)
+
+        page.locator("label[for='vehicleFilterEV']").click()
+        expect(page.locator("#csvfileList")).to_contain_text("No EV files found")
+        expect(page.locator("#csvFileCount")).to_have_text("0 files")
+
+    def test_badges_render_and_clicking_unknown_badge_opens_modal(self, page: Page, server_url):
+        mutable_files = json.loads(json.dumps(_MIXED_VEHICLE_FILES))
+        _route_mixed_files(page, mutable_files)
+        captured_posts = []
+
+        def handle_classify(route):
+            payload = route.request.post_data_json
+            captured_posts.append(payload)
+            for item in mutable_files["csv"]:
+                if item["run_id"] == payload["run_id"]:
+                    item["vehicle_type"] = payload["vehicle_type"]
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({
+                    "run_id": payload["run_id"],
+                    "vehicle_type": payload["vehicle_type"],
+                    "source": "manual",
+                }),
+            )
+
+        page.route("**/files/classify", handle_classify)
+        _goto(page, server_url)
+
+        expect(page.locator("#csvfileList .vehicle-badge-ev")).to_have_text("EV")
+        expect(page.locator("#csvfileList .vehicle-badge-ic")).to_have_text("IC")
+        unknown_btn = page.locator("#csvfileList button.vehicle-badge-unknown")
+        expect(unknown_btn).to_have_text("Unknown")
+
+        unknown_btn.click()
+        modal = page.locator("#classifyModal")
+        expect(modal).to_be_visible()
+        expect(page.locator("#classifyModalList")).to_contain_text("mystery_run.csv")
+
+        page.locator("#classifyModalList .classify-ev-btn").click()
+        assert captured_posts == [{"run_id": "mystery_run", "vehicle_type": "ev"}]
+        expect(modal).not_to_be_visible()
+        expect(page.locator("#csvfileList button.vehicle-badge-unknown")).to_have_count(0)
+        expect(page.locator("#csvfileList .vehicle-badge-ev")).to_have_count(2)
+
+    def test_upload_returning_unknown_opens_classify_modal_automatically(
+        self, page: Page, server_url, tmp_path
+    ):
+        mutable_files = {
+            "csv": [
+                {
+                    "name": "run.csv",
+                    "run_id": "run",
+                    "timestamp": "2024-01-15 10:00:00",
+                    "size": 256,
+                    "vehicle_type": "unknown",
+                }
+            ],
+            "rerun": [],
+            "raw": [],
+        }
+        _route_mixed_files(page, mutable_files)
+        captured_posts = []
+
+        page.route("**/upload", lambda r: r.fulfill(
+            status=200, content_type="application/json", body=_UPLOAD_OK
+        ))
+        page.route("**/progress**", lambda r: r.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "progress": "done",
+                "exception": {"present": False, "type": "None"},
+                "metrics": {
+                    "classifications": [
+                        {
+                            "run_id": "run",
+                            "filename": "run.binpb",
+                            "vehicle_type": "unknown",
+                            "source": "unclassified",
+                            "reason": "No EV or IC signals detected",
+                        }
+                    ]
+                },
+            }),
+        ))
+
+        def handle_classify(route):
+            payload = route.request.post_data_json
+            captured_posts.append(payload)
+            mutable_files["csv"][0]["vehicle_type"] = payload["vehicle_type"]
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({
+                    "run_id": payload["run_id"],
+                    "vehicle_type": payload["vehicle_type"],
+                    "source": "manual",
+                }),
+            )
+
+        page.route("**/files/classify", handle_classify)
+        _goto(page, server_url)
+
+        _write_upload_file(page, tmp_path)
+
+        modal = page.locator("#classifyModal")
+        expect(modal).to_be_visible(timeout=5000)
+        expect(page.locator("#classifyModalList")).to_contain_text("run.binpb")
+        expect(page.locator("#classifyModalList")).to_contain_text("No EV or IC signals detected")
+
+        page.locator("#classifyModalList .classify-ic-btn").click()
+        assert captured_posts == [{"run_id": "run", "vehicle_type": "ic"}]
+        expect(modal).not_to_be_visible()
+        expect(page.locator("#csvfileList .vehicle-badge-ic")).to_have_text("IC")
