@@ -106,15 +106,24 @@ def upload_data():
 
 
 def convert_files(files, **kwargs: Any):
-    for filename, content in files:
-        from io import BytesIO
-        from werkzeug.datastructures import FileStorage
+    current_thread_name = threading.current_thread().name
+    try:
+        for filename, content in files:
+            from io import BytesIO
+            from werkzeug.datastructures import FileStorage
 
-        file_like = FileStorage(
-            stream=BytesIO(content), name=filename, filename=filename
+            file_like = FileStorage(
+                stream=BytesIO(content), name=filename, filename=filename
+            )
+
+            convert_file(file_like, **kwargs)
+    except Exception as e:
+        app.logger.exception(
+            f"Thread {current_thread_name}: Unhandled exception during file conversion: {e}"
         )
-
-        convert_file(file_like, **kwargs)
+        if current_thread_name in app.config["tasks"]:
+            conversion_progress: ConversionProgress = app.config["tasks"][current_thread_name]
+            conversion_progress.exception = e
 
 
 def extract_first_timestamp(csv_path: Path) -> float | None:
@@ -146,7 +155,10 @@ def update_file_timestamps(paths: tuple[Path, ...], timestamp: float) -> None:
     """Set mtime/atime on all existing paths in the tuple."""
     for path in paths:
         if path.exists():
-            os.utime(path, (timestamp, timestamp))
+            try:
+                os.utime(path, (timestamp, timestamp))
+            except Exception as e:
+                app.logger.error("Failed to update timestamp for %s: %s", path, e)
         else:
             app.logger.error("Path does not exist when it should: %s", path)
 
@@ -207,7 +219,11 @@ def convert_file(file: FileStorage, is_debug: bool) -> None:
                 str(line_path.resolve()),
             )
         except Exception as exec:
-            raise
+            app.logger.error(
+                f"Thread {current_thread_name}: Failed to convert to line protocol: {exec}"
+            )
+            conversion_progress.exception = exec
+            return
         else:
             conversion_progress.progress = "uploading to influx"
 

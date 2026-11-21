@@ -65,12 +65,25 @@ def convert(input_path: Path, output_dir: Path) -> None:
 
     df = pd.read_csv(input_path.resolve(), usecols=["Timestamp", "Sensor", "Value"])
 
-    df = df[(df["Timestamp"] >= 90 * 1000) & (df["Timestamp"] <= 1000 * 1000)].copy()
+    # df = df[(df["Timestamp"] >= 90 * 1000) & (df["Timestamp"] <= 1000 * 1000)].copy()
     df["time_s"] = df["Timestamp"] / 1000.0
 
     rr.save(output_dir / Path(input_path.stem + ".rrd"))
 
-    log_data(df)
+    try:
+        log_data(df)
 
-    if has_gps(df):
-        log_gps(df)
+        if has_gps(df):
+            log_gps(df)
+    finally:
+        rec = (
+            rr.get_data_recording()
+            if hasattr(rr, "get_data_recording")
+            else rr.get_global_data_recording()
+            if hasattr(rr, "get_global_data_recording")
+            else None
+        )
+        if rec is not None and hasattr(rec, "flush"):
+            rec.flush()
+        if hasattr(rr, "disconnect"):
+            rr.disconnect()
