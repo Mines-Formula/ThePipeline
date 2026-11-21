@@ -13,6 +13,7 @@ from .formula import iter_formula_records
 from .models import DecodedRecord
 from .protobuf import ProtobufDecoder
 from .schema import SchemaRegistry
+from .vehicle_classifier import StreamVehicleClassifier, classify_csv_file
 
 
 def build_registry(config: InputConfig) -> SchemaRegistry:
@@ -50,18 +51,21 @@ def decode_to_csv(
     registry: SchemaRegistry | None = None,
 ) -> int:
     """Decode any supported input into the pipeline's stable five-column CSV."""
+    config.runtime_metrics["vehicle_classification"] = None
     output = Path(output_path)
     records = iter_decoded_records(source, config, registry)
     if config.input_format in {
         InputFormat.PROTOBUF_BINARY,
         InputFormat.PROTOBUF_DELIMITED,
     }:
-        return _write_telemetry_csv(records, output)
-    return _write_raw_can_via_dbc(records, output)
+        return _write_telemetry_csv(records, output, config=config)
+    return _write_raw_can_via_dbc(records, output, config=config)
 
 
 def _write_raw_can_via_dbc(
-    records: Iterator[DecodedRecord], output: Path
+    records: Iterator[DecodedRecord],
+    output: Path,
+    config: InputConfig | None = None,
 ) -> int:
     count = 0
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -84,17 +88,25 @@ def _write_raw_can_via_dbc(
                 raw.write(f"{normalized.timestamp},{normalized.can_id}{suffix}\n")
                 count += 1
         decode.make_known(str(raw_path), str(output))
+    if config is not None:
+        config.runtime_metrics["vehicle_classification"] = (
+            classify_csv_file(output) if output.is_file() else None
+        )
     return count
 
 
 def _write_telemetry_csv(
-    records: Iterator[DecodedRecord], output: Path
+    records: Iterator[DecodedRecord],
+    output: Path,
+    config: InputConfig | None = None,
 ) -> int:
+    classifier = StreamVehicleClassifier()
     count = 0
     with output.open("w", newline="") as stream:
         writer = csv.writer(stream)
         writer.writerow(["Timestamp", "CANID", "Sensor", "Value", "Unit"])
         for record in records:
+            classifier.observe_record(record)
             normalized = record.normalized
             if normalized is None:
                 continue
@@ -104,6 +116,10 @@ def _write_telemetry_csv(
             for row in rows:
                 writer.writerow(row)
                 count += 1
+    if config is not None:
+        config.runtime_metrics["vehicle_classification"] = classifier.finalize(
+            source_prefix="protobuf"
+        )
     return count
 
 
@@ -160,6 +176,9 @@ def _leaf_values(value, prefix=""):
 
 
 def _timestamp_mapping(value):
-    if isinstance(value, dict) and "seconds" in value and "nanos" in value:
-        return int(value["seconds"]) * 1000 + int(value["nanos"]) // 1_000_000
+    if isinstance(value, dict) and ("seconds" in value or "nanos" in value):
+        return (
+            int(value.get("seconds", 0)) * 1000
+            + int(value.get("nanos", 0)) // 1_000_000
+        )
     return value

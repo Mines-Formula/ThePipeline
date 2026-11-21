@@ -4,6 +4,7 @@
 /data/csvFiles/
 /data/rerun/
 /data/influxdb2_parameters/
+/data/vehicle_classifications.json
 /app/data/
 /infra/.submodule_head_last_seen
 

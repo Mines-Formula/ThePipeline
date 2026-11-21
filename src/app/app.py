@@ -16,8 +16,18 @@ import pandas as pd
 from csv_to_influxdb import line_protocol, write_to_influxDB
 from csv_to_rerun import csv_to_rerun
 from telemetry_input import InputConfig, InputFormat, decode_to_csv
+from telemetry_input.vehicle_classifier import (
+    VALID_MANUAL_VEHICLE_TYPES,
+    VALID_VEHICLE_TYPES,
+    classify_csv_file,
+)
 from constants import *
 from os import urandom
+from .classification_store import (
+    ClassificationStore,
+    canonical_run_id,
+    find_csv_for_run,
+)
 from .models import ConversionProgress, LimitedDict
 import threading
 
@@ -41,6 +51,22 @@ app.config["tasks"] = LimitedDict(max_size=20)
 CSV_DIR.mkdir(parents=True, exist_ok=True)
 RERUN_DIR.mkdir(parents=True, exist_ok=True)
 RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+_classification_stores: dict[Path, ClassificationStore] = {}
+_classification_stores_lock = threading.Lock()
+
+
+def _get_classification_store() -> ClassificationStore:
+    manifest_path = Path(CLASSIFICATIONS_FILE)
+    with _classification_stores_lock:
+        store = _classification_stores.get(manifest_path)
+        if store is None:
+            store = ClassificationStore(manifest_path)
+            _classification_stores[manifest_path] = store
+        return store
+
+
+_get_classification_store().seed_legacy_runs(RAW_DIR, CSV_DIR, RERUN_DIR)
 
 
 @app.route("/")
@@ -197,7 +223,7 @@ def convert_files(files, schema_data=None, **kwargs: Any):
                 else schema_paths[0]
             )
 
-        for filename, content in files:
+        for index, (filename, content) in enumerate(files):
             # Create a temporary FileStorage-like object for conversion
             from io import BytesIO
             from werkzeug.datastructures import FileStorage
@@ -206,7 +232,11 @@ def convert_files(files, schema_data=None, **kwargs: Any):
                 stream=BytesIO(content), name=filename, filename=filename
             )
 
-            convert_file(file_like, **kwargs)
+            convert_file(
+                file_like,
+                mark_finished=(index == len(files) - 1),
+                **kwargs,
+            )
 
 
 def extract_first_timestamp(csv_path: Path) -> float | None:
@@ -290,6 +320,8 @@ def convert_file(
     file: FileStorage,
     is_debug: bool,
     input_config: InputConfig | None = None,
+    *,
+    mark_finished: bool = True,
 ) -> None:
     """
     Converts .data following this flow:
@@ -419,8 +451,36 @@ def convert_file(
             conversion_progress.finished = True
             return
 
-        conversion_progress.progress = "done"
-        conversion_progress.finished = True
+        try:
+            classification = resolved_input_config.runtime_metrics.get(
+                "vehicle_classification"
+            )
+            if classification is None and csv_path.exists():
+                classification = classify_csv_file(csv_path)
+            if classification is not None:
+                _get_classification_store().record_upload(
+                    base_name, classification, csv_path
+                )
+                conversion_progress.metrics.setdefault("classifications", []).append(
+                    {
+                        "run_id": base_name,
+                        "filename": file.name,
+                        "vehicle_type": classification.vehicle_type,
+                        "source": classification.source,
+                        "reason": classification.reason,
+                    }
+                )
+                conversion_progress.metrics["vehicle_type"] = (
+                    classification.vehicle_type
+                )
+        except Exception as exec:
+            conversion_progress.exception = exec
+            conversion_progress.finished = True
+            return
+
+        if mark_finished:
+            conversion_progress.progress = "done"
+            conversion_progress.finished = True
 
 
 def _input_config_from_form(form, schema_file=None) -> InputConfig:
@@ -458,26 +518,97 @@ def list_files():
     type_ = request.args.get("type", "").casefold()
 
     try:
-        dir = TYPE_TO_DIR[type_]
+        directory = TYPE_TO_DIR[type_]
     except KeyError:
         return "Invalid type!", 400
 
+    vehicle_filter = request.args.get("vehicle", "all").casefold()
+    if vehicle_filter != "all" and vehicle_filter not in VALID_VEHICLE_TYPES:
+        return "Invalid vehicle filter!", 400
+
+    file_paths = [path for path in directory.iterdir() if path.is_file()]
+    vehicle_types = _get_classification_store().get_vehicle_types_for_files(
+        type_, [path.name for path in file_paths], CSV_DIR
+    )
+
     files = []
 
-    for path in dir.iterdir():
-        if path.is_file():
-            files.append(
-                {
-                    "name": path.name,
-                    "timestamp": datetime.fromtimestamp(path.stat().st_mtime).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                    "size": path.stat().st_size,
-                }
-            )
+    for path in file_paths:
+        vehicle_type = vehicle_types[path.name]
+        if vehicle_filter != "all" and vehicle_type != vehicle_filter:
+            continue
+        files.append(
+            {
+                "name": path.name,
+                "run_id": canonical_run_id(type_, path.name),
+                "timestamp": datetime.fromtimestamp(path.stat().st_mtime).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                "size": path.stat().st_size,
+                "vehicle_type": vehicle_type,
+            }
+        )
     files.sort(key=lambda f: f["timestamp"], reverse=True)
 
     return jsonify(files)
+
+
+def _is_safe_run_id(value: str) -> bool:
+    return bool(value) and "/" not in value and "\\" not in value and ".." not in value
+
+
+def _run_exists(run_id: str) -> bool:
+    for file_type, directory in (
+        ("csv", CSV_DIR),
+        ("rerun", RERUN_DIR),
+        ("raw", RAW_DIR),
+    ):
+        if not directory.is_dir():
+            continue
+        for path in directory.iterdir():
+            if path.is_file() and canonical_run_id(file_type, path.name) == run_id:
+                return True
+    return False
+
+
+@app.post("/files/classify")
+def classify_file_endpoint():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON request body is required."}), 400
+
+    vehicle_type = str(payload.get("vehicle_type", "")).strip().lower()
+    if vehicle_type not in VALID_MANUAL_VEHICLE_TYPES:
+        return jsonify({"error": "vehicle_type must be 'ic' or 'ev'."}), 400
+
+    raw_run_id = payload.get("run_id")
+    raw_filename = payload.get("filename")
+    if isinstance(raw_run_id, str) and raw_run_id.strip():
+        candidate = raw_run_id.strip()
+        if not _is_safe_run_id(candidate):
+            return jsonify({"error": "Invalid run_id."}), 400
+        run_id = candidate
+    elif isinstance(raw_filename, str) and raw_filename.strip():
+        filename = raw_filename.strip()
+        if not _is_safe_run_id(filename):
+            return jsonify({"error": "Invalid filename."}), 400
+        file_type = str(payload.get("type", "")).strip().lower()
+        run_id = canonical_run_id(file_type, filename)
+    else:
+        return jsonify({"error": "run_id or filename is required."}), 400
+
+    if not _run_exists(run_id):
+        return jsonify({"error": f"Run {run_id!r} was not found."}), 404
+
+    csv_path = find_csv_for_run(CSV_DIR, run_id)
+    _get_classification_store().set_manual(run_id, vehicle_type, csv_path)
+    return jsonify(
+        {
+            "run_id": run_id,
+            "vehicle_type": vehicle_type,
+            "source": "manual",
+        }
+    )
 
 
 @app.route("/files/download/<path:filename>")

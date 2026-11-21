@@ -18,7 +18,7 @@ const state = {
 };
 
 const FILE_TYPES = Object.keys(state);
-const activityState = { selectedDate: null, selectedYear: "auto" };
+const activityState = { selectedDate: null, selectedYear: "auto", vehicleFilter: "all" };
 
 const LEVEL_COLORS = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"];
 const MONTH_NAMES = [
@@ -163,7 +163,14 @@ function startPolling(taskName) {
         clearInterval(pollIntervalId);
         pollIntervalId = null;
         showAlert("Upload and processing complete!", "success");
-        loadAllFiles();
+        await loadAllFiles();
+        const classifications = (data.metrics && data.metrics.classifications) || [];
+        const unknownItems = classifications.filter(
+          (item) => item && item.vehicle_type === "unknown",
+        );
+        if (unknownItems.length > 0) {
+          openClassifyModal(unknownItems);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -249,6 +256,41 @@ function formatTooltipDate(dateStr) {
   });
 }
 
+function canonicalRunId(type, filename) {
+  const dotIdx = filename.lastIndexOf(".");
+  let stem = dotIdx > 0 ? filename.slice(0, dotIdx) : filename;
+  if (type === "raw" && stem.startsWith("raw_")) {
+    stem = stem.slice("raw_".length);
+  } else if (type === "csv" && stem.endsWith("_unixtime")) {
+    stem = stem.slice(0, -"_unixtime".length);
+  }
+  return stem;
+}
+
+function matchesVehicleFilter(file) {
+  if (activityState.vehicleFilter === "all") {
+    return true;
+  }
+  const vehicleType = (file && file.vehicle_type ? file.vehicle_type : "unknown").toLowerCase();
+  return vehicleType === activityState.vehicleFilter;
+}
+
+function attachVehicleFilterListeners() {
+  const radios = document.querySelectorAll('input[name="vehicleFilter"]');
+  radios.forEach((radio) => {
+    if (!radio.dataset.listenerAttached) {
+      radio.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          activityState.vehicleFilter = e.target.value;
+          renderHeatmap();
+          renderAllFileLists();
+        }
+      });
+      radio.dataset.listenerAttached = "true";
+    }
+  });
+}
+
 function renderAllFileLists() {
   FILE_TYPES.forEach(renderFileList);
 }
@@ -265,13 +307,18 @@ function renderHeatmap() {
   const yearSelect = document.getElementById("activityYearSelect");
   if (!container) return;
 
-  const files = FILE_TYPES.flatMap((type) => state[type].files);
+  const allFiles = FILE_TYPES.flatMap((type) => state[type].files);
+  const filteredByType = {};
+  FILE_TYPES.forEach((type) => {
+    filteredByType[type] = state[type].files.filter(matchesVehicleFilter);
+  });
+  const files = FILE_TYPES.flatMap((type) => filteredByType[type]);
 
   // Group files by date
   const counts = {};
   const countsByType = {};
   for (const type of FILE_TYPES) {
-    for (const file of state[type].files) {
+    for (const file of filteredByType[type]) {
       const date = extractFileDate(file);
       if (!date) continue;
       countsByType[date] ??= { csv: 0, rerun: 0, raw: 0 };
@@ -287,16 +334,17 @@ function renderHeatmap() {
     }
   }
 
-  // Determine available years
+  // Determine available years from all loaded files so year choices stay stable
+  const allFileDates = allFiles.map(extractFileDate).filter(Boolean);
   const currentYear = new Date().getFullYear();
   const yearsSet = new Set([currentYear]);
-  fileDates.forEach((d) => yearsSet.add(parseInt(d.slice(0, 4), 10)));
+  allFileDates.forEach((d) => yearsSet.add(parseInt(d.slice(0, 4), 10)));
   const years = Array.from(yearsSet).sort((a, b) => b - a);
 
   // If selectedYear is 'auto', choose smart default
   if (!activityState.selectedYear || activityState.selectedYear === "auto") {
-    if (fileDates.length > 0) {
-      const sortedDates = [...fileDates].sort();
+    if (allFileDates.length > 0) {
+      const sortedDates = [...allFileDates].sort();
       const latestDateStr = sortedDates[sortedDates.length - 1];
       const latestYear = parseInt(latestDateStr.slice(0, 4), 10);
       const [ly, lm, ld] = latestDateStr.split("-").map(Number);
@@ -507,11 +555,12 @@ function renderFileList(type) {
   if (!list) return;
 
   const allFiles = state[type].files || [];
+  const vehicleFiles = allFiles.filter(matchesVehicleFilter);
   const selectedDate = activityState.selectedDate;
 
   // Set header file count badge
   if (fileCountBadge) {
-    fileCountBadge.textContent = `${allFiles.length} file${allFiles.length === 1 ? "" : "s"}`;
+    fileCountBadge.textContent = `${vehicleFiles.length} file${vehicleFiles.length === 1 ? "" : "s"}`;
   }
 
   // Configure clear button
@@ -523,9 +572,9 @@ function renderFileList(type) {
   }
 
   // Filter files if selectedDate is set
-  let displayFiles = allFiles;
+  let displayFiles = vehicleFiles;
   if (selectedDate) {
-    displayFiles = allFiles.filter((f) => extractFileDate(f) === selectedDate);
+    displayFiles = vehicleFiles.filter((f) => extractFileDate(f) === selectedDate);
     if (filterBanner) {
       filterBanner.style.setProperty("display", "flex", "important");
       if (filteredDateSpan) filteredDateSpan.textContent = selectedDate;
@@ -544,8 +593,18 @@ function renderFileList(type) {
     return;
   }
 
+  if (vehicleFiles.length === 0) {
+    const label = activityState.vehicleFilter.toUpperCase();
+    list.innerHTML = `<li class="list-group-item text-muted">No ${label} files found</li>`;
+    return;
+  }
+
   if (displayFiles.length === 0) {
-    list.innerHTML = `<li class="list-group-item text-muted">No files found for ${selectedDate}</li>`;
+    const prefix =
+      activityState.vehicleFilter === "all"
+        ? ""
+        : `${activityState.vehicleFilter.toUpperCase()} `;
+    list.innerHTML = `<li class="list-group-item text-muted">No ${prefix}files found for ${selectedDate}</li>`;
     return;
   }
 
@@ -556,17 +615,26 @@ function renderFileList(type) {
     const leftDiv = document.createElement("div");
     leftDiv.className = "d-flex flex-column me-2 overflow-hidden";
 
+    const nameRow = document.createElement("div");
+    nameRow.className = "d-flex align-items-center gap-1 min-w-0";
+
     const nameSpan = document.createElement("span");
     nameSpan.textContent = file.name;
-    nameSpan.className = "me-2 text-truncate";
-    nameSpan.style.maxWidth = "240px";
+    nameSpan.className = "me-1 text-truncate";
+    nameSpan.style.maxWidth = "210px";
     nameSpan.title = file.name;
+    nameRow.appendChild(nameSpan);
+
+    const vehicleBadge = createVehicleBadge(type, file);
+    if (vehicleBadge) {
+      nameRow.appendChild(vehicleBadge);
+    }
 
     const timeSpan = document.createElement("small");
     timeSpan.textContent = `${file.timestamp} • ${formatSize(file.size)}`;
     timeSpan.className = "text-muted";
 
-    leftDiv.appendChild(nameSpan);
+    leftDiv.appendChild(nameRow);
     leftDiv.appendChild(timeSpan);
 
     const downloadA = document.createElement("a");
@@ -578,6 +646,194 @@ function renderFileList(type) {
     li.appendChild(leftDiv);
     li.appendChild(downloadA);
     list.appendChild(li);
+  }
+}
+
+function createVehicleBadge(type, file) {
+  if (!file || !file.vehicle_type) {
+    return null;
+  }
+  const vehicle = file.vehicle_type.toLowerCase();
+  if (vehicle === "ev") {
+    const span = document.createElement("span");
+    span.className = "badge rounded-pill vehicle-badge vehicle-badge-ev";
+    span.textContent = "EV";
+    return span;
+  }
+  if (vehicle === "ic") {
+    const span = document.createElement("span");
+    span.className = "badge rounded-pill vehicle-badge vehicle-badge-ic";
+    span.textContent = "IC";
+    return span;
+  }
+  if (vehicle === "unknown") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "badge rounded-pill border-0 vehicle-badge vehicle-badge-unknown";
+    btn.textContent = "Unknown";
+    btn.title = "Click to classify as IC or EV";
+    const runId = file.run_id || canonicalRunId(type, file.name);
+    btn.addEventListener("click", () => {
+      openClassifyModal([
+        {
+          run_id: runId,
+          filename: file.name,
+          reason: "Could not automatically determine IC or EV",
+        },
+      ]);
+    });
+    return btn;
+  }
+  return null;
+}
+
+function showClassifyModalElement(modalEl) {
+  if (window.bootstrap && window.bootstrap.Modal) {
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    return;
+  }
+  modalEl.classList.add("show");
+  modalEl.style.display = "block";
+  modalEl.removeAttribute("aria-hidden");
+  modalEl.setAttribute("aria-modal", "true");
+}
+
+function hideClassifyModalElement(modalEl) {
+  if (window.bootstrap && window.bootstrap.Modal) {
+    window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+    return;
+  }
+  modalEl.classList.remove("show");
+  modalEl.style.display = "none";
+  modalEl.setAttribute("aria-hidden", "true");
+  modalEl.removeAttribute("aria-modal");
+}
+
+function openClassifyModal(items) {
+  const modalEl = document.getElementById("classifyModal");
+  const listEl = document.getElementById("classifyModalList");
+  const errorEl = document.getElementById("classifyModalError");
+  if (!modalEl || !listEl || !items || items.length === 0) {
+    return;
+  }
+
+  if (errorEl) {
+    errorEl.classList.add("d-none");
+    errorEl.textContent = "";
+  }
+
+  listEl.innerHTML = "";
+  const seenRuns = new Set();
+  for (const item of items) {
+    if (!item || !item.run_id || seenRuns.has(item.run_id)) {
+      continue;
+    }
+    seenRuns.add(item.run_id);
+
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex justify-content-between align-items-center gap-2";
+    li.dataset.runId = item.run_id;
+    li.dataset.resolved = "false";
+
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "overflow-hidden";
+
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "fw-semibold text-truncate";
+    titleDiv.textContent = item.filename || item.run_id;
+
+    const reasonSmall = document.createElement("small");
+    reasonSmall.className = "text-muted d-block";
+    reasonSmall.textContent = item.reason || "No EV or IC signals detected";
+
+    infoDiv.appendChild(titleDiv);
+    infoDiv.appendChild(reasonSmall);
+
+    const actionDiv = document.createElement("div");
+    actionDiv.className = "btn-group btn-group-sm flex-shrink-0";
+
+    const icBtn = document.createElement("button");
+    icBtn.type = "button";
+    icBtn.className = "btn btn-outline-warning classify-ic-btn";
+    icBtn.textContent = "IC";
+
+    const evBtn = document.createElement("button");
+    evBtn.type = "button";
+    evBtn.className = "btn btn-outline-success classify-ev-btn";
+    evBtn.textContent = "EV";
+
+    icBtn.addEventListener("click", () =>
+      submitClassification(item.run_id, "ic", li, actionDiv, modalEl),
+    );
+    evBtn.addEventListener("click", () =>
+      submitClassification(item.run_id, "ev", li, actionDiv, modalEl),
+    );
+
+    actionDiv.appendChild(icBtn);
+    actionDiv.appendChild(evBtn);
+    li.appendChild(infoDiv);
+    li.appendChild(actionDiv);
+    listEl.appendChild(li);
+  }
+
+  [document.getElementById("classifyModalCloseBtn"), document.getElementById("classifyModalCloseX")].forEach(
+    (btn) => {
+      if (btn && !btn.dataset.fallbackAttached) {
+        btn.addEventListener("click", () => {
+          if (!(window.bootstrap && window.bootstrap.Modal)) {
+            hideClassifyModalElement(modalEl);
+          }
+        });
+        btn.dataset.fallbackAttached = "true";
+      }
+    },
+  );
+
+  showClassifyModalElement(modalEl);
+}
+
+async function submitClassification(runId, vehicleType, rowEl, actionDiv, modalEl) {
+  const errorEl = document.getElementById("classifyModalError");
+  const buttons = actionDiv.querySelectorAll("button");
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  if (errorEl) {
+    errorEl.classList.add("d-none");
+    errorEl.textContent = "";
+  }
+
+  try {
+    const res = await fetch("/files/classify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runId, vehicle_type: vehicleType }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.error || "Failed to save classification.");
+    }
+
+    rowEl.dataset.resolved = "true";
+    actionDiv.innerHTML = `<span class="badge rounded-pill vehicle-badge vehicle-badge-${vehicleType}">${vehicleType.toUpperCase()} saved</span>`;
+
+    await loadAllFiles();
+
+    const listEl = document.getElementById("classifyModalList");
+    const pending = listEl
+      ? listEl.querySelectorAll('li[data-resolved="false"]').length
+      : 0;
+    if (pending === 0) {
+      hideClassifyModalElement(modalEl);
+    }
+  } catch (err) {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+    if (errorEl) {
+      errorEl.textContent = err.message || "Failed to save classification.";
+      errorEl.classList.remove("d-none");
+    }
   }
 }
 
@@ -606,4 +862,5 @@ async function loadAllFiles() {
   renderHeatmap();
 }
 
+attachVehicleFilterListeners();
 loadAllFiles();

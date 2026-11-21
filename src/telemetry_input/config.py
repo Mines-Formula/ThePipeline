@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 
 class InputFormat(str, Enum):
@@ -46,7 +47,7 @@ class InputConfig:
             "unit": "unit",
         }
     )
-    runtime_metrics: dict[str, int] = field(
+    runtime_metrics: dict[str, Any] = field(
         default_factory=lambda: {"records_skipped": 0}, init=False
     )
 
